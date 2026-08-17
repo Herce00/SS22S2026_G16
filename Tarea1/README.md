@@ -43,7 +43,7 @@
 ### 2.2 Tratamiento de celdas vacías
 - Nulos encontrados: `genero` (60), `gasto_q` (497), `ciudad` (152).
 
-  ![imagen](/Tarea1/img/Limpieza2.PNG)
+  ![imagen](/Tarea1/img/Limpieza3.PNG)
 
 ### 2.3 Estandarización de valores y formatos
 - `genero`, `ciudad`, `categoria`: normalización de mayúsculas/minúsculas y eliminación de espacios extra.
