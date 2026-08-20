@@ -18,13 +18,13 @@ Keneth Willard Lopez Ovalle              202100106
 ### Tareas
 1. Tarea 1
 
-    [Documentacion Tarea 1](/Tarea1/README.md)
+    [Documentacion Tarea 1](Tarea1/README.md)
 
 ### Practicas
 
 1. Practica 1
 
-   [Documentacion Practica 1](/Practica1/README.md)
+   [Documentacion Practica 1](Practica1/README.md)
 
 
 ---
