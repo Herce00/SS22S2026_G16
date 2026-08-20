@@ -1,0 +1,84 @@
+import os
+from typing import Dict, Optional
+import pandas as pd
+from sqlalchemy import create_engine, Engine
+
+
+def crear_motor_sql_server(
+    servidor: Optional[str] = None,
+    base_datos: Optional[str] = None,
+    usuario: Optional[str] = None,
+    password: Optional[str] = None,
+    driver: Optional[str] = None,
+    trusted_connection: Optional[bool] = None
+) -> Engine:
+    servidor = servidor or os.getenv("SQL_SERVER_HOST", "localhost")
+    base_datos = base_datos or os.getenv("SQL_SERVER_DATABASE", "VuelosDW")
+    usuario = usuario or os.getenv("SQL_SERVER_USER", "")
+    password = password or os.getenv("SQL_SERVER_PASSWORD", "")
+    driver = driver or os.getenv("SQL_SERVER_DRIVER", "ODBC Driver 17 for SQL Server")
+    
+    if trusted_connection is None:
+        trusted_connection = os.getenv("SQL_SERVER_TRUSTED", "yes").lower() in ("yes", "true", "1")
+
+    driver_url = driver.replace(" ", "+")
+
+    if trusted_connection or not usuario:
+        url_conexion = f"mssql+pyodbc://@{servidor}/{base_datos}?driver={driver_url}&trusted_connection=yes"
+    else:
+        url_conexion = f"mssql+pyodbc://{usuario}:{password}@{servidor}/{base_datos}?driver={driver_url}"
+
+    print(f"[ETL - Carga] Configurando motor de conexión para SQL Server: servidor='{servidor}', base_datos='{base_datos}'")
+    engine = create_engine(url_conexion, fast_executemany=True)
+    return engine
+
+
+def cargar_modelo_multidimensional(
+    engine: Engine,
+    tablas_dimensionales: Dict[str, pd.DataFrame],
+    if_exists: str = "append",
+    chunksize: int = 1000
+) -> Dict[str, int]:
+    orden_carga = [
+        'dim_fecha',
+        'dim_aerolinea',
+        'dim_aeropuerto',
+        'dim_pasajero',
+        'dim_aeronave',
+        'dim_canal_pago',
+        'fact_vuelo_pasaje'
+    ]
+
+    resumen_carga = {}
+
+    print(f"[ETL - Carga] Iniciando carga masiva de datos en {engine.dialect.name.upper()}...")
+
+    with engine.begin() as conn:
+        for nombre_tabla in orden_carga:
+            if nombre_tabla in tablas_dimensionales:
+                df_tabla = tablas_dimensionales[nombre_tabla]
+                print(f"[ETL - Carga] Insertando {len(df_tabla):,} filas en la tabla '{nombre_tabla}'...")
+                
+                df_tabla.to_sql(
+                    name=nombre_tabla,
+                    con=conn,
+                    if_exists=if_exists,
+                    index=False,
+                    chunksize=chunksize,
+                    method='multi' if engine.dialect.name == 'sqlite' else None
+                )
+                resumen_carga[nombre_tabla] = len(df_tabla)
+                print(f"[ETL - Carga] [OK] '{nombre_tabla}' cargada exitosamente.")
+
+    print(f"[ETL - Carga] Exito: Todas las tablas ({len(resumen_carga)}) fueron cargadas correctamente.")
+    return resumen_carga
+
+
+def cargar_a_sqlite_local(
+    ruta_sqlite: str,
+    tablas_dimensionales: Dict[str, pd.DataFrame]
+) -> Engine:
+    print(f"[ETL - Local] Creando base de datos SQLite de validación en: {ruta_sqlite}")
+    engine_sqlite = create_engine(f"sqlite:///{ruta_sqlite}")
+    cargar_modelo_multidimensional(engine_sqlite, tablas_dimensionales, if_exists="replace")
+    return engine_sqlite
