@@ -6,7 +6,8 @@ from etl.load import crear_motor_sql_server, cargar_modelo_multidimensional, car
 
 
 def parse_argumentos():
-    parser = argparse.ArgumentParser(description="Pipeline ETL de Vuelos para Modelo Multidimensional")
+    parser = argparse.ArgumentParser(
+        description="Pipeline ETL de Vuelos para Modelo Multidimensional")
     parser.add_argument(
         "--archivo-crudo",
         type=str,
@@ -43,9 +44,11 @@ def main():
     if args.export_staging:
         staging_dir = os.path.join(ruta_base, "staging")
         os.makedirs(staging_dir, exist_ok=True)
-        print(f"[ETL - Staging] Exportando tablas dimensionales a: {staging_dir}")
+        print(
+            f"[ETL - Staging] Exportando tablas dimensionales a: {staging_dir}")
         for nombre, df_tab in tablas_dimensionales.items():
-            df_tab.to_parquet(os.path.join(staging_dir, f"{nombre}.parquet"), index=False)
+            df_tab.to_parquet(os.path.join(
+                staging_dir, f"{nombre}.parquet"), index=False)
         print("[ETL - Staging] [OK] Tablas Parquet exportadas correctamente.")
 
     if args.local:
@@ -59,23 +62,26 @@ def main():
     try:
         engine_sql = crear_motor_sql_server()
         with engine_sql.connect() as conn:
-            print("[ETL - Carga SQL Server] [OK] Conexion establecida con exito con SQL Server.")
-        
-        cargar_modelo_multidimensional(engine_sql, tablas_dimensionales, if_exists="append")
+            print(
+                "[ETL - Carga SQL Server] [OK] Conexion establecida con exito con SQL Server.")
+
+        cargar_modelo_multidimensional(
+            engine_sql, tablas_dimensionales, if_exists="append")
         print("\n" + "=" * 80)
         print("[OK] PIPELINE ETL COMPLETADO EXITOSAMENTE EN MICROSOFT SQL SERVER")
         print("=" * 80)
 
     except Exception as e:
         print("\n" + "!" * 80)
-        print(f"[AVISO - Carga SQL Server] No se pudo conectar a la instancia de SQL Server:")
+        print(
+            f"[AVISO - Carga SQL Server] No se pudo conectar a la instancia de SQL Server:")
         print(f">> Detalle: {e}")
         print("\n>> Ejecutando carga automatica de respaldo en SQLite local (vuelos_local.db)...")
         print("!" * 80)
-        
+
         ruta_sqlite = os.path.join(ruta_base, "vuelos_local.db")
         cargar_a_sqlite_local(ruta_sqlite, tablas_dimensionales)
-        
+
         print("\n" + "=" * 80)
         print("[OK] DATOS PROCESADOS Y DISPONIBLES LOCALMENTE EN 'vuelos_local.db'")
         print(">> Nota para Persona B: Ejecutar 'schema.sql' en SQL Server y correr nuevamente:")

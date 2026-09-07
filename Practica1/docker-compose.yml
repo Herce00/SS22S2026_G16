@@ -53,6 +53,19 @@ services:
       -C
       -i /scripts/init.sql"
 
+  dbgate:
+    image: dbgate/dbgate
+    container_name: dbgate_practica1
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    volumes:
+      - dbgate_data:/root/.dbgate
+    depends_on:
+      - sqlserver
+
 volumes:
   sqlserver_data:
     name: practica1_sqlserver_data
+  dbgate_data:
+    name: practica1_dbgate_data

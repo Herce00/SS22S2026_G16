@@ -1,4 +1,5 @@
 import os
+import platform
 
 from typing import Dict, Optional
 import pandas as pd
@@ -10,19 +11,30 @@ load_dotenv()
 
 def crear_motor_sql_server(
     servidor: Optional[str] = None,
+    puerto: Optional[str] = None,
     base_datos: Optional[str] = None,
     usuario: Optional[str] = None,
     password: Optional[str] = None,
 ) -> Engine:
-    servidor = servidor or os.getenv("SQL_SERVER_HOST", "localhost:1433")
+    servidor = servidor or os.getenv("SQL_SERVER_HOST", "localhost")
+    puerto = puerto or os.getenv("SQL_SERVER_PORT", "1433")
     base_datos = base_datos or os.getenv("SQL_SERVER_DATABASE", "VuelosDW")
     usuario = usuario or os.getenv("SQL_SERVER_USER", "")
     password = password or os.getenv("SQL_SERVER_PASSWORD", "")
 
-    url_conexion = f"mssql+pymssql://{usuario}:{password}@{servidor}/{base_datos}"
+    sistema = platform.system()  # 'Windows', 'Darwin' (macOS), 'Linux'
+
+    if sistema == "Windows":
+        url_conexion = (
+            f"mssql+pyodbc://{usuario}:{password}@{servidor}:{puerto}/{base_datos}"
+            f"?driver=ODBC+Driver+18+for+SQL+Server&TrustServerCertificate=yes&Encrypt=yes"
+        )
+    else:
+        # macOS y Linux siguen usando pymssql con formato de coma
+        url_conexion = f"mssql+pymssql://{usuario}:{password}@{servidor}:{puerto}/{base_datos}"
 
     print(
-        f"[ETL - Carga] Configurando motor de conexión para SQL Server: servidor='{servidor}', base_datos='{base_datos}'")
+        f"[ETL - Carga] Sistema detectado: {sistema}. Configurando motor de conexión: servidor='{servidor}', puerto='{puerto}', base_datos='{base_datos}'")
     engine = create_engine(url_conexion)
     return engine
 
