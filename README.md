@@ -26,5 +26,9 @@ Keneth Willard Lopez Ovalle              202100106
 
    [Documentacion Practica 1](Practica1/README.md)
 
+2. Practica 2
+
+   [Documentacion y Steering Practica 2](Practica2/STEERING.md)
+
 
 ---
