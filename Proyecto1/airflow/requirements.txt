@@ -1,0 +1,3 @@
+# Dependencias de ingesta y conexión para Python (rol A)
+psycopg[binary]==3.3.5
+pandas==2.2.3

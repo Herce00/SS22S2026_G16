@@ -1,0 +1,3 @@
+# Versiones fijadas de dbt Core y adaptador PostgreSQL (aisladas de Airflow)
+dbt-core==1.12.5
+dbt-postgres==1.11.0

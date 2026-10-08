@@ -99,9 +99,9 @@ Las versiones ya están elegidas en [design.md](design.md); esta tarea comprueba
 
 ## T6 — Imagen de Airflow con dbt
 
-- [ ] **Rojo (estática):** `airflow/Dockerfile` parte de una imagen con etiqueta exacta; `requirements.txt` y `requirements-dbt.txt` fijan cada paquete con `==`; `requirements.txt` no incluye `apache-airflow` ni `dbt`.
-- [ ] **Rojo (integración):** dentro de la imagen construida, `airflow version` devuelve `3.3.2`; `dbt --version` reporta dbt Core `1.12.5` y el adaptador `postgres` `1.11.0`; `dbt` se resuelve en `/opt/dbt-venv`.
-- [ ] **Verde:** crear `airflow/Dockerfile`, `airflow/requirements.txt` y `airflow/requirements-dbt.txt`.
+- [x] **Rojo (estática):** `airflow/Dockerfile` parte de una imagen con etiqueta exacta; `requirements.txt` y `requirements-dbt.txt` fijan cada paquete con `==`; `requirements.txt` no incluye `apache-airflow` ni `dbt`.
+- [x] **Rojo (integración):** dentro de la imagen construida, `airflow version` devuelve `3.3.2`; `dbt --version` reporta dbt Core `1.12.5` y el adaptador `postgres` `1.11.0`; `dbt` se resuelve en `/opt/dbt-venv`.
+- [x] **Verde:** crear `airflow/Dockerfile`, `airflow/requirements.txt` y `airflow/requirements-dbt.txt`.
 
 **Verificación:** `docker compose build` y `pytest tests/entorno -k "imagen"`.
 **Commit:** `feat(p1-entorno): build airflow image with isolated dbt`
