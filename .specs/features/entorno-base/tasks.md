@@ -57,10 +57,10 @@ No produce código. Es requisito para el resto.
 
 Las versiones ya están elegidas en [design.md](design.md); esta tarea comprueba que funcionan juntas.
 
-- [ ] Ejecutar `pip install --dry-run dbt-core==1.12.5 dbt-postgres==1.11.0` dentro de `apache/airflow:3.3.2-python3.12` y confirmar que se resuelven sin conflicto.
-- [ ] Si no se resuelven, elegir el parche de dbt Core 1.12 más reciente que sí lo haga y actualizar [design.md](design.md).
-- [ ] Confirmar la ruta del endpoint de salud en el `docker-compose.yaml` oficial de Airflow 3.3.2.
-- [ ] Fijar las versiones exactas de `pytest` y `PyYAML` para `tests/requirements-dev.txt`.
+- [x] Ejecutar `pip install --dry-run dbt-core==1.12.5 dbt-postgres==1.11.0` dentro de `apache/airflow:3.3.2-python3.12` y confirmar que se resuelven sin conflicto.
+- [x] Si no se resuelven, elegir el parche de dbt Core 1.12 más reciente que sí lo haga y actualizar [design.md](design.md).
+- [x] Confirmar la ruta del endpoint de salud en el `docker-compose.yaml` oficial de Airflow 3.3.2.
+- [x] Fijar las versiones exactas de `pytest` y `PyYAML` para `tests/requirements-dev.txt`.
 
 **Verificación:** la sección "Puntos abiertos" de [design.md](design.md) solo conserva la validación con B.
 **Commit:** `docs(p1-entorno): pin environment versions`
