@@ -108,10 +108,10 @@ Las versiones ya están elegidas en [design.md](design.md); esta tarea comprueba
 
 ## T7 — Servicios de Airflow
 
-- [ ] **Rojo (estática):** el compose declara `airflow-db`, `airflow-init`, `airflow-apiserver`, `airflow-scheduler` y `airflow-dag-processor`; el ejecutor es `LocalExecutor`; los DAGs de ejemplo están desactivados; no hay servicios `redis`, `worker` ni `flower`; los servicios de Airflow dependen de `airflow-init` completado.
-- [ ] **Rojo (integración):** todos los servicios de larga duración quedan `healthy`; `airflow-init` termina con código 0; el endpoint de salud responde en `AIRFLOW_PORT`; la lista de DAGs está vacía.
-- [ ] **Verde:** agregar los servicios de Airflow al compose y crear `airflow/dags/.gitkeep`.
-- [ ] La prueba de T1 pasa a verde.
+- [x] **Rojo (estática):** el compose declara `airflow-db`, `airflow-init`, `airflow-apiserver`, `airflow-scheduler` y `airflow-dag-processor`; el ejecutor es `LocalExecutor`; los DAGs de ejemplo están desactivados; no hay servicios `redis`, `worker` ni `flower`; los servicios de Airflow dependen de `airflow-init` completado.
+- [x] **Rojo (integración):** todos los servicios de larga duración quedan `healthy`; `airflow-init` termina con código 0; el endpoint de salud responde en `AIRFLOW_PORT`; la lista de DAGs está vacía.
+- [x] **Verde:** agregar los servicios de Airflow al compose y crear `airflow/dags/.gitkeep`.
+- [x] La prueba de T1 pasa a verde.
 
 **Verificación:** `docker compose up -d` y `pytest tests/entorno -k "airflow"`.
 **Commit:** `feat(p1-entorno): add airflow services with local executor`
