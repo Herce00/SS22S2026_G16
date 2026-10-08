@@ -140,10 +140,10 @@ Las versiones ya están elegidas en [design.md](design.md); esta tarea comprueba
 
 ## T10 — Documentación
 
-- [ ] Actualizar la tabla "Versiones" de [tech-stack.md](../../steering/tech-stack.md) con las versiones fijadas.
-- [ ] Marcar como resuelto "Verificar y fijar las versiones del entorno" en [architecture.md](../../steering/architecture.md).
-- [ ] Escribir en `README.md` la sección "Manual de implementación": requisitos previos, creación de `.env`, arranque, verificación, acceso a cada servicio, ejecución de pruebas, reinicio y problemas frecuentes.
-- [ ] Seguir el manual paso a paso en un clon limpio y corregir lo que no funcione.
+- [x] Actualizar la tabla "Versiones" de [tech-stack.md](../../steering/tech-stack.md) con las versiones fijadas.
+- [x] Marcar como resuelto "Verificar y fijar las versiones del entorno" en [architecture.md](../../steering/architecture.md).
+- [x] Escribir en `README.md` la sección "Manual de implementación": requisitos previos, creación de `.env`, arranque, verificación, acceso a cada servicio, ejecución de pruebas, reinicio y problemas frecuentes.
+- [x] Seguir el manual paso a paso en un clon limpio y corregir lo que no funcione.
 
 **Verificación:** el manual se completa sin pasos fuera del documento.
 **Commit:** `docs(p1-entorno): add implementation manual and pinned versions`

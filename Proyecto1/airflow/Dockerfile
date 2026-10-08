@@ -16,5 +16,5 @@ RUN /opt/dbt-venv/bin/pip install --no-cache-dir -r /opt/airflow/requirements-db
 COPY --chown=airflow:root requirements.txt /opt/airflow/requirements.txt
 RUN pip install --no-cache-dir -r /opt/airflow/requirements.txt
 
-# Exponer el binario de dbt en el PATH
-ENV PATH="/opt/dbt-venv/bin:${PATH}"
+# Exponer el binario de dbt en el PATH (al final para no opacar el python de Airflow)
+ENV PATH="${PATH}:/opt/dbt-venv/bin"
