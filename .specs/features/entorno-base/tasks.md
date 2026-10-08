@@ -67,11 +67,11 @@ Las versiones ya están elegidas en [design.md](design.md); esta tarea comprueba
 
 ## T3 — Configuración y exclusiones
 
-- [ ] **Rojo:** pruebas estáticas que exigen:
+- [x] **Rojo:** pruebas estáticas que exigen:
   - `.env.example` existe y contiene todas las variables de la tabla "Variables de `.env`" de [design.md](design.md).
   - `.gitignore` excluye `.env`, `logs/`, `target/` y `dbt_packages/`.
   - Ningún valor de `.env.example` coincide con un `.env` real presente.
-- [ ] **Verde:** crear `.env.example` y `.gitignore`.
+- [x] **Verde:** crear `.env.example` y `.gitignore`.
 
 **Verificación:** las pruebas nuevas pasan; `git check-ignore .env` devuelve la ruta.
 **Commit:** `feat(p1-entorno): add env template and ignore rules`
