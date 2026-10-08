@@ -87,12 +87,12 @@ Las versiones ya están elegidas en [design.md](design.md); esta tarea comprueba
 
 ## T5 — DDL de schemas
 
-- [ ] **Rojo (integración):**
+- [x] **Rojo (integración):**
   - En `dw` existen los schemas `raw`, `staging` y `marts`.
   - Ninguno de los tres contiene tablas.
   - El usuario del DW puede crear una tabla en cada schema.
   - Ejecutar el script por segunda vez termina sin error.
-- [ ] **Verde:** crear `sql/ddl/01_schemas.sql` y montarlo en `/docker-entrypoint-initdb.d/` de `dw`.
+- [x] **Verde:** crear `sql/ddl/01_schemas.sql` y montarlo en `/docker-entrypoint-initdb.d/` de `dw`.
 
 **Verificación:** `docker compose down -v`, `docker compose up -d dw` y `pytest tests/entorno -k "schemas"`.
 **Commit:** `feat(p1-entorno): create raw, staging and marts schemas`
