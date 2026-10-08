@@ -78,9 +78,9 @@ Las versiones ya están elegidas en [design.md](design.md); esta tarea comprueba
 
 ## T4 — Servicios `dw` y `src`
 
-- [ ] **Rojo (estática):** el compose declara `dw` y `src`; ambas imágenes tienen etiqueta exacta distinta de `latest`; cada una tiene `healthcheck` y volumen con nombre; ningún valor de contraseña es literal; sin `DW_PASSWORD`, `docker compose config` falla nombrando la variable.
-- [ ] **Rojo (integración):** `dw` y `src` alcanzan el estado `healthy` y responden `SELECT 1`; están publicados en puertos del host distintos.
-- [ ] **Verde:** crear `docker-compose.yml` con los servicios `dw` y `src`.
+- [x] **Rojo (estática):** el compose declara `dw` y `src`; ambas imágenes tienen etiqueta exacta distinta de `latest`; cada una tiene `healthcheck` y volumen con nombre; ningún valor de contraseña es literal; sin `DW_PASSWORD`, `docker compose config` falla nombrando la variable.
+- [x] **Rojo (integración):** `dw` y `src` alcanzan el estado `healthy` y responden `SELECT 1`; están publicados en puertos del host distintos.
+- [x] **Verde:** crear `docker-compose.yml` con los servicios `dw` y `src`.
 
 **Verificación:** `docker compose up -d dw src` y `pytest tests/entorno -k "bases"`.
 **Commit:** `feat(p1-entorno): add warehouse and source postgres services`

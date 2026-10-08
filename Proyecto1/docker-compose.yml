@@ -1,0 +1,41 @@
+services:
+  dw:
+    image: postgres:16
+    container_name: sgfood_dw
+    environment:
+      POSTGRES_DB: ${DW_DB:?DW_DB is required}
+      POSTGRES_USER: ${DW_USER:?DW_USER is required}
+      POSTGRES_PASSWORD: ${DW_PASSWORD:?DW_PASSWORD is required}
+    ports:
+      - "${DW_PORT:-5433}:5432"
+    volumes:
+      - dw_data:/var/lib/postgresql/data
+      - ./sql/ddl:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  src:
+    image: postgres:16
+    container_name: sgfood_src
+    environment:
+      POSTGRES_DB: ${SRC_DB:?SRC_DB is required}
+      POSTGRES_USER: ${SRC_USER:?SRC_USER is required}
+      POSTGRES_PASSWORD: ${SRC_PASSWORD:?SRC_PASSWORD is required}
+    ports:
+      - "${SRC_PORT:-5434}:5432"
+    volumes:
+      - src_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  dw_data:
+  src_data:
