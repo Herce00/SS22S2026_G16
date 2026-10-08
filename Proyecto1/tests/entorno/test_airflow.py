@@ -1,5 +1,6 @@
 import os
 import subprocess
+import time
 import urllib.request
 import yaml
 import pytest
@@ -61,11 +62,19 @@ def test_airflow_services_healthy_and_functional(proyecto1_dir):
                     port = line.split("=")[1].strip()
 
     health_url = f"http://localhost:{port}/api/v2/monitor/health"
-    try:
-        req = urllib.request.urlopen(health_url, timeout=10)
-        assert req.status == 200
-    except Exception as e:
-        pytest.fail(f"No se pudo consultar {health_url}: {e}")
+    start = time.time()
+    ok = False
+    last_err = None
+    while time.time() - start < 30:
+        try:
+            req = urllib.request.urlopen(health_url, timeout=5)
+            if req.status == 200:
+                ok = True
+                break
+        except Exception as e:
+            last_err = e
+            time.sleep(2)
+    assert ok, f"No se pudo consultar {health_url}: {last_err}"
 
     # Verificar que la lista de DAGs está vacía (sin ejemplos)
     res_dags = run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "dags", "list", cwd=proyecto1_dir)

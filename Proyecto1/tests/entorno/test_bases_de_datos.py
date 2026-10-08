@@ -31,10 +31,13 @@ def test_bases_compose_declarations(proyecto1_dir):
     assert "src_data" in volumes, "Volumen nombrado src_data no definido"
 
 def test_compose_fails_without_dw_password(proyecto1_dir, tmp_path):
-    """Verifica que docker compose config falle si falta una variable obligatoria."""
-    empty_env = tmp_path / "empty.env"
-    empty_env.write_text("DW_DB=sgfood_dw\nDW_USER=dw_user\n", encoding="utf-8")
-    res = run_docker_compose("--env-file", str(empty_env), "config", cwd=proyecto1_dir)
+    """Verifica que docker compose config falle si falta DW_PASSWORD."""
+    env_example_path = os.path.join(proyecto1_dir, ".env.example")
+    with open(env_example_path, "r", encoding="utf-8") as f:
+        lines = [l for l in f if not l.startswith("DW_PASSWORD=")]
+    test_env = tmp_path / "without_dw_pass.env"
+    test_env.write_text("".join(lines), encoding="utf-8")
+    res = run_docker_compose("--env-file", str(test_env), "config", cwd=proyecto1_dir)
     assert res.returncode != 0
     assert "DW_PASSWORD" in (res.stderr + res.stdout)
 

@@ -131,9 +131,9 @@ Las versiones ya están elegidas en [design.md](design.md); esta tarea comprueba
 
 ## T9 — Reinicio limpio
 
-- [ ] **Rojo (lenta):** `tests/entorno/test_reinicio.py` crea una tabla temporal en `dw`, ejecuta `docker compose down -v` y `docker compose up -d`, y exige que la tabla no exista, que los tres schemas existan y que todos los servicios queden `healthy`.
-- [ ] **Verde:** ajustar volúmenes, dependencias o tiempos de `healthcheck` que la prueba revele.
-- [ ] Ejecutar la suite completa desde un entorno sin contenedores ni volúmenes.
+- [x] **Rojo (lenta):** `tests/entorno/test_reinicio.py` crea una tabla temporal en `dw`, ejecuta `docker compose down -v` y `docker compose up -d`, y exige que la tabla no exista, que los tres schemas existan y que todos los servicios queden `healthy`.
+- [x] **Verde:** ajustar volúmenes, dependencias o tiempos de `healthcheck` que la prueba revele.
+- [x] Ejecutar la suite completa desde un entorno sin contenedores ni volúmenes.
 
 **Verificación:** `pytest tests/entorno` completo, incluidas las pruebas lentas.
 **Commit:** `test(p1-entorno): verify clean restart`
