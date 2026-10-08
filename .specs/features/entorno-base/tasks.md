@@ -118,13 +118,13 @@ Las versiones ya están elegidas en [design.md](design.md); esta tarea comprueba
 
 ## T8 — Conexiones y montajes
 
-- [ ] **Rojo (integración):**
+- [x] **Rojo (integración):**
   - Dentro de `airflow-scheduler` existen `DW_HOST`, `DW_PORT`, `DW_DB`, `DW_USER`, `DW_PASSWORD` y sus equivalentes `SRC_`.
   - Con esas variables, una consulta `SELECT 1` responde contra `dw` y contra `src`.
   - `airflow connections get sgfood_dw` y `airflow connections get sgfood_src` devuelven la conexión.
   - Existen `/opt/airflow/dags`, `/opt/airflow/python`, `/opt/airflow/dbt_project` y `/opt/airflow/data`.
   - `DBT_PROJECT_DIR` y `DBT_PROFILES_DIR` están definidas.
-- [ ] **Verde:** agregar variables, conexiones `AIRFLOW_CONN_*` y montajes al compose; crear `python/.gitkeep` y `data/.gitkeep`.
+- [x] **Verde:** agregar variables, conexiones `AIRFLOW_CONN_*` y montajes al compose; crear `python/.gitkeep` y `data/.gitkeep`.
 
 **Verificación:** `pytest tests/entorno -k "conexiones or montajes"`.
 **Commit:** `feat(p1-entorno): wire airflow connections and mounts`

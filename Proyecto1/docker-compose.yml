@@ -8,8 +8,25 @@ x-airflow-common: &airflow-common
     AIRFLOW_ADMIN_USER: ${AIRFLOW_ADMIN_USER:-admin}
     AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:-admin}
     AIRFLOW_UID: ${AIRFLOW_UID:-50000}
+    DW_HOST: dw
+    DW_PORT: "5432"
+    DW_DB: ${DW_DB:?DW_DB is required}
+    DW_USER: ${DW_USER:?DW_USER is required}
+    DW_PASSWORD: ${DW_PASSWORD:?DW_PASSWORD is required}
+    SRC_HOST: src
+    SRC_PORT: "5432"
+    SRC_DB: ${SRC_DB:?SRC_DB is required}
+    SRC_USER: ${SRC_USER:?SRC_USER is required}
+    SRC_PASSWORD: ${SRC_PASSWORD:?SRC_PASSWORD is required}
+    AIRFLOW_CONN_SGFOOD_DW: postgresql+psycopg://${DW_USER}:${DW_PASSWORD}@dw:5432/${DW_DB}
+    AIRFLOW_CONN_SGFOOD_SRC: postgresql+psycopg://${SRC_USER}:${SRC_PASSWORD}@src:5432/${SRC_DB}
+    DBT_PROJECT_DIR: /opt/airflow/dbt_project
+    DBT_PROFILES_DIR: /opt/airflow/dbt_project
   volumes:
     - ./airflow/dags:/opt/airflow/dags
+    - ./python:/opt/airflow/python
+    - ./dbt_project:/opt/airflow/dbt_project
+    - ./data:/opt/airflow/data
     - ./airflow/logs:/opt/airflow/logs
 
 services:
