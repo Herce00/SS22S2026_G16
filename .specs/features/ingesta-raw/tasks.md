@@ -51,7 +51,7 @@ Toda la feature es zona verde del rol A. No requiere acuerdos previos con B.
 
 ## T3 — Extracción desde CSV
 
-- [ ] **Rojo:** crear `tests/ingesta/fixtures/` y pruebas unitarias sobre la lectura de CSV:
+- [x] **Rojo:** crear `tests/ingesta/fixtures/` y pruebas unitarias sobre la lectura de CSV:
   - Un archivo con BOM devuelve el primer nombre de columna sin el carácter invisible.
   - Los valores salen como texto, sin conversión: `007` sigue siendo `007`, `1.50` sigue siendo `1.50`.
   - Un campo vacío sale como `None`; un campo con solo espacios conserva los espacios.
@@ -60,7 +60,7 @@ Toda la feature es zona verde del rol A. No requiere acuerdos previos con B.
   - Una línea completamente vacía se omite y no cuenta como fila.
   - Un campo entre comillas con una coma dentro se lee como un solo valor.
   - Con cada CSV real de `data/`, la cantidad de filas coincide con la del contrato.
-- [ ] **Verde:** implementar la lectura de CSV en `extraccion.py`.
+- [x] **Verde:** implementar la lectura de CSV en `extraccion.py`.
 
 **Verificación:** `pytest tests/ingesta -k "extraccion_csv"`.
 **Commit:** `feat(p1-ingesta): extract rows from csv sources`
