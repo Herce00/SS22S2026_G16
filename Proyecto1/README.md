@@ -94,7 +94,7 @@ psql -h localhost -p 5433 -U dw_user -d sgfood_dw
 - **Puerto:** Valor configurado en `SRC_PORT` (por defecto `5434`)
 - **Base de datos:** `sgfood_src`
 - **Usuario:** `src_user`
-- **Schema poblado:** `oltp_sgfood` (7 tablas con 4.863 registros)
+- **Schema poblado:** `oltp_sgfood` (7 tablas con 4.763 registros)
 
 Consulta de validación con `psql`:
 ```bash
@@ -112,8 +112,8 @@ psql -h localhost -p 5434 -U src_user -d sgfood_src -c "SELECT table_name FROM i
 
 Los datos de origen del proyecto residen en `data/` y se versionan de forma binaria/literal byte a byte mediante `.gitattributes` (`data/* -text`):
 
-1. **Base transaccional PostgreSQL (`sgfood_oltp.sql`):** 7 tablas en `oltp_sgfood` con un total de 4.863 registros (`sucursal`: 6, `categoria`: 8, `marca`: 10, `producto`: 80, `cliente`: 250, `venta`: 1.200, `venta_detalle`: 3.209).
-2. **Archivos planos CSV:** 5 archivos de fuentes externas con un total de 4.001 registros (`inventario_bodega.csv`: 3.840, `proveedores_precios.csv`: 103, `devoluciones.csv`: 80, `metas_ventas.csv`: 48, `promociones.csv`: 30).
+1. **Base transaccional PostgreSQL (`sgfood_oltp.sql`):** 7 tablas en `oltp_sgfood` con un total de 4.763 registros (`sucursal`: 6, `categoria`: 8, `marca`: 10, `producto`: 80, `cliente`: 250, `venta`: 1.200, `venta_detalle`: 3.209).
+2. **Archivos planos CSV:** 5 archivos de fuentes externas con un total de 4.101 registros (`inventario_bodega.csv`: 3.840, `proveedores_precios.csv`: 103, `devoluciones.csv`: 80, `metas_ventas.csv`: 48, `promociones.csv`: 30).
 3. **Casos de calidad opcionales (`casos_calidad_opcionales.csv`):** 10 registros con anomalías sintéticas. Según la decisión D8 de steering, **no forman parte de la ingesta principal** y su utilización para auditorías de calidad queda bajo criterio de dbt (Rol B).
 
 #### Contrato y Especificación Técnica
