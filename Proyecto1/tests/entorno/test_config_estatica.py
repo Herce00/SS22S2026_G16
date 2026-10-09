@@ -58,3 +58,31 @@ def test_gitignore_exclusions(proyecto1_dir):
     for pattern in [".env", "logs/", "target/", "dbt_packages/"]:
         assert pattern in content, f"Patrón {pattern} no encontrado en Proyecto1/.gitignore"
 
+def test_no_default_credentials_and_fails_without_admin_password(proyecto1_dir, tmp_path):
+    """Verifica que ningún valor del compose contenga contraseña literal o valor por defecto para usuarios/contraseñas, y que sin AIRFLOW_ADMIN_PASSWORD falle nombrándola."""
+    compose_path = os.path.join(proyecto1_dir, "docker-compose.yml")
+    with open(compose_path, "r", encoding="utf-8") as f:
+        compose_content = f.read()
+
+    # Verificar que no hayan valores por defecto con ':-' en variables de usuario o contraseña
+    for var in ["AIRFLOW_ADMIN_USER", "AIRFLOW_ADMIN_PASSWORD", "DW_PASSWORD", "SRC_PASSWORD", "AIRFLOW_DB_PASSWORD"]:
+        assert f"${{{var}:-" not in compose_content, f"{var} tiene valor por defecto con ':-' en docker-compose.yml"
+
+    # Crear un .env temporal con todas las variables requeridas excepto AIRFLOW_ADMIN_PASSWORD
+    env_lines = []
+    real_env = os.path.join(proyecto1_dir, ".env")
+    if os.path.exists(real_env):
+        with open(real_env, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip() and not line.startswith("#"):
+                    k = line.split("=")[0].strip()
+                    if k != "AIRFLOW_ADMIN_PASSWORD":
+                        env_lines.append(line)
+    temp_env = tmp_path / "test.env"
+    temp_env.write_text("".join(env_lines), encoding="utf-8")
+
+    # Ejecutar docker compose --env-file <temp_env> config sin AIRFLOW_ADMIN_PASSWORD
+    res = run_docker_compose("--env-file", str(temp_env), "config", cwd=proyecto1_dir)
+    assert res.returncode != 0, "docker compose config debió fallar sin AIRFLOW_ADMIN_PASSWORD"
+    assert "AIRFLOW_ADMIN_PASSWORD" in (res.stderr + res.stdout), "El error de docker compose config debe nombrar AIRFLOW_ADMIN_PASSWORD"
+
