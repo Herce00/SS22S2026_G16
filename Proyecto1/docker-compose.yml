@@ -5,6 +5,9 @@ x-airflow-common: &airflow-common
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
     AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?AIRFLOW_JWT_SECRET is required}
+    AIRFLOW__API_AUTH__JWT_ISSUER: airflow
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg://${AIRFLOW_DB_USER:?AIRFLOW_DB_USER is required}:${AIRFLOW_DB_PASSWORD:?AIRFLOW_DB_PASSWORD is required}@airflow-db:5432/airflow
     AIRFLOW_ADMIN_USER: ${AIRFLOW_ADMIN_USER:?AIRFLOW_ADMIN_USER is required}
     AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?AIRFLOW_ADMIN_PASSWORD is required}

@@ -17,6 +17,7 @@ EXPECTED_ENV_VARS = [
     "AIRFLOW_ADMIN_PASSWORD",
     "AIRFLOW_PORT",
     "AIRFLOW_UID",
+    "AIRFLOW_JWT_SECRET",
 ]
 
 def test_docker_compose_config(proyecto1_dir):
