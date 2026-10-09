@@ -3,6 +3,7 @@ x-airflow-common: &airflow-common
   build: ./airflow
   environment:
     AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
     AIRFLOW__CORE__LOAD_EXAMPLES: "false"
     AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg://${AIRFLOW_DB_USER:?AIRFLOW_DB_USER is required}:${AIRFLOW_DB_PASSWORD:?AIRFLOW_DB_PASSWORD is required}@airflow-db:5432/airflow
     AIRFLOW_ADMIN_USER: ${AIRFLOW_ADMIN_USER:-admin}
@@ -91,13 +92,13 @@ services:
       - -c
       - |
         airflow db migrate &&
-        (airflow users create \
+        airflow users create \
           --username "$${AIRFLOW_ADMIN_USER}" \
           --password "$${AIRFLOW_ADMIN_PASSWORD}" \
           --firstname Admin \
           --lastname User \
           --role Admin \
-          --email admin@example.com || true)
+          --email admin@example.com
     depends_on:
       airflow-db:
         condition: service_healthy
