@@ -1,5 +1,6 @@
 import os
 import subprocess
+import yaml
 from conftest import run_docker_compose
 
 EXPECTED_ENV_VARS = [
@@ -86,4 +87,62 @@ def test_no_default_credentials_and_fails_without_admin_password(proyecto1_dir, 
     res = run_docker_compose("--env-file", str(temp_env), "config", cwd=proyecto1_dir)
     assert res.returncode != 0, "docker compose config debió fallar sin AIRFLOW_ADMIN_PASSWORD"
     assert "AIRFLOW_ADMIN_PASSWORD" in (res.stderr + res.stdout), "El error de docker compose config debe nombrar AIRFLOW_ADMIN_PASSWORD"
+
+def test_no_image_uses_latest_tag(proyecto1_dir):
+    """Verifica que ninguna imagen en el compose use la etiqueta 'latest', incluida airflow-db."""
+    compose_path = os.path.join(proyecto1_dir, "docker-compose.yml")
+    with open(compose_path, "r", encoding="utf-8") as f:
+        compose = yaml.safe_load(f)
+
+    images_checked = []
+    if "x-airflow-common" in compose and "image" in compose["x-airflow-common"]:
+        images_checked.append(compose["x-airflow-common"]["image"])
+
+    services = compose.get("services", {})
+    for svc_name, svc_conf in services.items():
+        if "image" in svc_conf:
+            images_checked.append(svc_conf["image"])
+
+    assert len(images_checked) > 0, "No se encontraron imágenes declaradas en el compose"
+    for img in images_checked:
+        assert ":latest" not in img, f"La imagen {img} usa la etiqueta 'latest'"
+        assert ":" in img, f"La imagen {img} debe especificar una versión fija y no omitir etiqueta"
+
+def test_dw_and_src_distinct_host_ports(proyecto1_dir, env_config):
+    """Verifica que dw y src publiquen puertos del host distintos."""
+    dw_port = env_config.get("DW_PORT")
+    src_port = env_config.get("SRC_PORT")
+    assert dw_port is not None and src_port is not None, "DW_PORT y SRC_PORT deben estar configurados"
+    assert dw_port != src_port, f"DW_PORT ({dw_port}) y SRC_PORT ({src_port}) no deben coincidir"
+
+    res = run_docker_compose("config", "--format", "json", cwd=proyecto1_dir)
+    assert res.returncode == 0
+    import json
+    config_data = json.loads(res.stdout)
+
+    services = config_data.get("services", {})
+    dw_ports = services.get("dw", {}).get("ports", [])
+    src_ports = services.get("src", {}).get("ports", [])
+
+    dw_published = [p.get("published") for p in dw_ports if isinstance(p, dict) and "published" in p]
+    src_published = [p.get("published") for p in src_ports if isinstance(p, dict) and "published" in p]
+    if dw_published and src_published:
+        assert set(dw_published).isdisjoint(set(src_published)), f"Puertos publicados en host colisionan: {dw_published} vs {src_published}"
+
+def test_airflow_services_depend_on_airflow_init(proyecto1_dir):
+    """Verifica que los servicios de Airflow dependan de airflow-init con la condición service_completed_successfully."""
+    compose_path = os.path.join(proyecto1_dir, "docker-compose.yml")
+    with open(compose_path, "r", encoding="utf-8") as f:
+        compose = yaml.safe_load(f)
+
+    services = compose.get("services", {})
+    airflow_services = ["airflow-apiserver", "airflow-scheduler", "airflow-dag-processor"]
+
+    for svc in airflow_services:
+        assert svc in services, f"Servicio {svc} no encontrado en docker-compose.yml"
+        deps = services[svc].get("depends_on", {})
+        assert "airflow-init" in deps, f"{svc} no depende de airflow-init"
+        init_dep = deps["airflow-init"]
+        condition = init_dep.get("condition") if isinstance(init_dep, dict) else None
+        assert condition == "service_completed_successfully", f"{svc} debe depender de airflow-init con condición 'service_completed_successfully', pero tiene '{condition}'"
 
