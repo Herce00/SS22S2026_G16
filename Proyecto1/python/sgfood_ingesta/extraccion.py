@@ -9,6 +9,7 @@ from sgfood_ingesta.config import Fuente
 from sgfood_ingesta.errores import (
     ConfiguracionInvalida,
     EncabezadoInvalido,
+    ErrorIngesta,
     FilaInvalida,
 )
 
@@ -75,7 +76,7 @@ def extraer_filas_csv(
     - Las cadenas vacias se convierten en None (unica transformacion de valores).
     """
     if not os.path.isfile(ruta_csv):
-        raise ConfiguracionInvalida(f"El archivo CSV no existe: '{ruta_csv}'")
+        raise ErrorIngesta(f"El archivo CSV no existe: '{ruta_csv}'")
 
     with open(ruta_csv, mode="r", encoding="utf-8-sig", newline="") as f:
         reader = csv.reader(f)

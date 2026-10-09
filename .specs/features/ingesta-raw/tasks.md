@@ -127,16 +127,16 @@ Toda la feature es zona verde del rol A. No requiere acuerdos previos con B.
 
 ## T8 — Idempotencia y fallos
 
-- [ ] **Rojo (integración):** `tests/ingesta/test_idempotencia.py`:
+- [x] **Rojo (integración):** `tests/ingesta/test_idempotencia.py`:
   - Dos cargas completas seguidas dejan cada tabla con la misma cantidad de filas y el mismo contenido de negocio.
-- [ ] **Rojo (integración):** `tests/ingesta/test_fallos.py`, con una carga completa previa y `SGFOOD_DATA_DIR` apuntando a una copia temporal de `fixtures/` dentro del contenedor:
+- [x] **Rojo (integración):** `tests/ingesta/test_fallos.py`, con una carga completa previa y `SGFOOD_DATA_DIR` apuntando a una copia temporal de `fixtures/` dentro del contenedor:
   - Encabezado incorrecto en `promociones.csv`: código de salida 1 y `raw.promociones` conserva sus 30 filas y su `_loaded_at`.
   - Fila con un campo de menos: código de salida 1, mensaje con el número de línea y la tabla conserva sus 30 filas.
   - Archivo CSV inexistente: código de salida 1 y la tabla conserva sus filas.
   - En una carga completa donde falla una tabla, el proceso termina con código 1 y las tablas anteriores quedan confirmadas.
-- [ ] **Rojo (unitaria):** con una carga cuyo conteo final no coincide con las filas enviadas, se lanza `ConteoInconsistente` y la transacción se revierte.
-- [ ] **Verde:** implementar lo necesario para que la transacción se revierta en todos los casos.
-- [ ] Confirmar que ningún archivo de `data/` fue modificado: `git status --short data/` vacío.
+- [x] **Rojo (unitaria):** con una carga cuyo conteo final no coincide con las filas enviadas, se lanza `ConteoInconsistente` y la transacción se revierte.
+- [x] **Verde:** implementar lo necesario para que la transacción se revierta en todos los casos.
+- [x] Confirmar que ningún archivo de `data/` fue modificado: `git status --short data/` vacío.
 
 **Verificación:** `pytest tests/ingesta -k "idempotencia or fallos"`.
 **Commit:** `feat(p1-ingesta): keep previous data when a load fails`
