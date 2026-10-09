@@ -96,15 +96,15 @@ Toda la feature es zona verde del rol A. No requiere acuerdos previos con B.
 
 ## T6 — Carga completa y auditoría
 
-- [ ] **Rojo (integración):** `tests/ingesta/test_carga_completa.py`:
+- [x] **Rojo (integración):** `tests/ingesta/test_carga_completa.py`:
   - `python -m sgfood_ingesta` termina con código 0.
   - Cada tabla de `raw` tiene la cantidad de filas del contrato; el total es 8864.
   - En cada tabla, `_source` tiene un único valor, igual al `origen` de `fuentes.yml`.
   - Las 12 tablas comparten un único valor de `_loaded_at`.
   - Tras cargar después solo `devoluciones`, su `_loaded_at` es posterior y el de las demás no cambió.
   - Los conteos de `oltp_sgfood` no cambiaron y `staging` y `marts` siguen sin tablas.
-- [ ] **Rojo (ajuste):** retirar de `tests/contrato/test_tablas_raw.py` la comprobación de tablas vacías.
-- [ ] **Verde:** implementar `cargar_todas` con `loaded_at` compartido.
+- [x] **Rojo (ajuste):** retirar de `tests/contrato/test_tablas_raw.py` la comprobación de tablas vacías.
+- [x] **Verde:** implementar `cargar_todas` con `loaded_at` compartido.
 
 **Verificación:** `pytest tests/ingesta -k "carga_completa"` y `pytest tests/contrato`.
 **Commit:** `feat(p1-ingesta): load all sources with shared audit timestamp`

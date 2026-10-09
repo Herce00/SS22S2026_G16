@@ -105,22 +105,6 @@ def test_raw_tables_have_no_constraints(proyecto1_dir, env_config, fuentes_data)
 
 
 @pytest.mark.integracion
-def test_raw_tables_are_empty(proyecto1_dir, env_config, fuentes_data):
-    """Verifica que todas las tablas de raw existan vacias."""
-    user = env_config.get("DW_USER", "dw_user")
-    db = env_config.get("DW_DB", "sgfood_dw")
-
-    for f in fuentes_data.get("fuentes", []):
-        tabla = f.get("tabla_raw")
-        query = f"SELECT count(*) FROM raw.{tabla};"
-        res = run_docker_compose("exec", "-T", "dw", "psql", "-U", user, "-d", db, "-t", "-A", "-c", query, cwd=proyecto1_dir)
-        assert res.returncode == 0, f"Error consultando filas de raw.{tabla}: {res.stderr}"
-
-        count_str = res.stdout.strip()
-        assert count_str == "0", f"raw.{tabla} no esta vacia: {count_str} filas"
-
-
-@pytest.mark.integracion
 def test_raw_ddl_idempotent(proyecto1_dir, env_config):
     """Verifica que 02_raw_tables.sql pueda ejecutarse nuevamente con ON_ERROR_STOP=1 sin error."""
     user = env_config.get("DW_USER", "dw_user")
