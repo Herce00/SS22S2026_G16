@@ -146,3 +146,11 @@ def test_airflow_services_depend_on_airflow_init(proyecto1_dir):
         condition = init_dep.get("condition") if isinstance(init_dep, dict) else None
         assert condition == "service_completed_successfully", f"{svc} debe depender de airflow-init con condición 'service_completed_successfully', pero tiene '{condition}'"
 
+def test_pytest_ini_excludes_lenta_by_default(proyecto1_dir):
+    """Verifica que pytest.ini exista y configure 'addopts = -m \"not lenta\"' para proteger contra ejecuciones destructivas por defecto."""
+    pytest_ini_path = os.path.join(proyecto1_dir, "pytest.ini")
+    assert os.path.exists(pytest_ini_path), "pytest.ini no existe en Proyecto1"
+    with open(pytest_ini_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    assert 'addopts = -m "not lenta"' in content, "pytest.ini debe excluir pruebas lentas por defecto con addopts = -m \"not lenta\""
+

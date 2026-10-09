@@ -116,9 +116,14 @@ Para ejecutarlas desde el host:
    pytest tests/entorno -m "not integracion and not lenta"
    ```
 
-3. Ejecute la suite completa de integración:
+3. Ejecute la suite estándar de integración (las pruebas destructivas marcadas como `lenta` están excluidas por defecto para proteger los datos de `raw`):
    ```bash
    pytest tests/entorno
+   ```
+
+4. Para ejecutar de manera explícita la prueba destructiva de reinicio limpio (`down -v` y validación de estado limpio):
+   ```bash
+   pytest tests/entorno -m lenta
    ```
 
 ### 7. Reinicio a estado limpio
