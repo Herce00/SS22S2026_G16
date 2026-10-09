@@ -42,14 +42,19 @@ def test_compose_fails_without_dw_password(proyecto1_dir, tmp_path):
     assert "DW_PASSWORD" in (res.stderr + res.stdout)
 
 @pytest.mark.integracion
-def test_bases_healthy_and_responsive(proyecto1_dir):
+def test_bases_healthy_and_responsive(proyecto1_dir, env_config):
     """Verifica que dw y src estén healthy y respondan SELECT 1."""
+    dw_user = env_config.get("DW_USER", "dw_user")
+    dw_db = env_config.get("DW_DB", "sgfood_dw")
+    src_user = env_config.get("SRC_USER", "src_user")
+    src_db = env_config.get("SRC_DB", "sgfood_src")
+
     # Verificar salud de dw
     res_dw = run_docker_compose("exec", "-T", "dw", "pg_isready", cwd=proyecto1_dir)
     assert res_dw.returncode == 0, f"dw pg_isready falló: {res_dw.stderr}"
 
     # Consulta SELECT 1 en dw
-    res_sql_dw = run_docker_compose("exec", "-T", "dw", "psql", "-U", "dw_user", "-d", "sgfood_dw", "-c", "SELECT 1;", cwd=proyecto1_dir)
+    res_sql_dw = run_docker_compose("exec", "-T", "dw", "psql", "-U", dw_user, "-d", dw_db, "-c", "SELECT 1;", cwd=proyecto1_dir)
     assert res_sql_dw.returncode == 0 and "1" in res_sql_dw.stdout
 
     # Verificar salud de src
@@ -57,5 +62,5 @@ def test_bases_healthy_and_responsive(proyecto1_dir):
     assert res_src.returncode == 0, f"src pg_isready falló: {res_src.stderr}"
 
     # Consulta SELECT 1 en src
-    res_sql_src = run_docker_compose("exec", "-T", "src", "psql", "-U", "src_user", "-d", "sgfood_src", "-c", "SELECT 1;", cwd=proyecto1_dir)
+    res_sql_src = run_docker_compose("exec", "-T", "src", "psql", "-U", src_user, "-d", src_db, "-c", "SELECT 1;", cwd=proyecto1_dir)
     assert res_sql_src.returncode == 0 and "1" in res_sql_src.stdout

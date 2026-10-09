@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import time
@@ -76,8 +77,8 @@ def test_airflow_services_healthy_and_functional(proyecto1_dir):
             time.sleep(2)
     assert ok, f"No se pudo consultar {health_url}: {last_err}"
 
-    # Verificar que la lista de DAGs está vacía (sin ejemplos)
-    res_dags = run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "dags", "list", cwd=proyecto1_dir)
+    # Verificar que la lista de DAGs está verdaderamente vacía
+    res_dags = run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "dags", "list", "-o", "json", cwd=proyecto1_dir)
     assert res_dags.returncode == 0
-    # No deben haber DAGs de ejemplo listados
-    assert "example_" not in res_dags.stdout
+    dags_list = json.loads(res_dags.stdout)
+    assert len(dags_list) == 0, f"Se esperaba lista de DAGs vacía pero contiene: {dags_list}"
