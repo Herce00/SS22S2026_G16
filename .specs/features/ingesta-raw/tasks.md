@@ -38,13 +38,13 @@ Toda la feature es zona verde del rol A. No requiere acuerdos previos con B.
 
 ## T2 — Lectura de la configuración
 
-- [ ] **Rojo:** pruebas unitarias sobre `config.py`:
+- [x] **Rojo:** pruebas unitarias sobre `config.py`:
   - Con el `fuentes.yml` real, devuelve 12 objetos `Fuente` en el orden declarado.
   - Archivo inexistente produce `ConfiguracionInvalida`.
   - Produce `ConfiguracionInvalida`: falta `version`, falta un campo, `tipo` desconocido, `tabla_raw` duplicado, columnas duplicadas, lista de columnas vacía, `origen` de tipo `postgres` sin schema.
   - `Fuente` es inmutable.
   - La ruta se toma de `SGFOOD_FUENTES_PATH` cuando está definida.
-- [ ] **Verde:** implementar `config.py`.
+- [x] **Verde:** implementar `config.py`.
 
 **Verificación:** `pytest tests/ingesta -k "config"`.
 **Commit:** `feat(p1-ingesta): load and validate sources configuration`

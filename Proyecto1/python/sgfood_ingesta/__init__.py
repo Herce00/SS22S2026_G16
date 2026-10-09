@@ -1,6 +1,6 @@
 """Paquete de ingesta técnica para SG-Food."""
 from datetime import datetime
-from sgfood_ingesta.config import Fuente
+from sgfood_ingesta.config import Fuente, cargar_configuracion
 from sgfood_ingesta.ingesta import ResultadoCarga
 from sgfood_ingesta.errores import (
     ErrorIngesta,
@@ -13,7 +13,7 @@ from sgfood_ingesta.errores import (
 
 
 def listar_fuentes() -> list[Fuente]:
-    raise NotImplementedError
+    return cargar_configuracion()
 
 
 def cargar_fuente(tabla_raw: str, loaded_at: datetime | None = None) -> ResultadoCarga:
