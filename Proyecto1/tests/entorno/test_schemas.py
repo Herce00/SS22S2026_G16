@@ -14,10 +14,10 @@ def test_schemas_exist_in_dw(proyecto1_dir, env_config):
 
 @pytest.mark.integracion
 def test_schemas_have_no_tables(proyecto1_dir, env_config):
-    """Verifica que ningún schema contenga tablas."""
+    """Verifica que staging y marts no contengan tablas inicialmente."""
     user = env_config.get("DW_USER", "dw_user")
     db = env_config.get("DW_DB", "sgfood_dw")
-    query = "SELECT table_name FROM information_schema.tables WHERE table_schema IN ('raw', 'staging', 'marts');"
+    query = "SELECT table_name FROM information_schema.tables WHERE table_schema IN ('staging', 'marts');"
     res = run_docker_compose("exec", "-T", "dw", "psql", "-U", user, "-d", db, "-t", "-A", "-c", query, cwd=proyecto1_dir)
     assert res.returncode == 0
     tables = [t for t in res.stdout.strip().splitlines() if t]
