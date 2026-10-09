@@ -189,7 +189,7 @@ Esta feature solo crea contenedores lógicos, sin tablas.
 | `sgfood_dw` | `raw` | `sql/ddl/01_schemas.sql` | Tablas cargadas por Python |
 | `sgfood_dw` | `staging` | `sql/ddl/01_schemas.sql` | Modelos dbt |
 | `sgfood_dw` | `marts` | `sql/ddl/01_schemas.sql` | Dimensiones y hechos |
-| `sgfood_src` | `public` | PostgreSQL | Tablas transaccionales (otra feature) |
+| `sgfood_src` | `oltp_sgfood` | `data/sgfood_oltp.sql` (feature `contrato-raw`) | 7 tablas transaccionales |
 
 El script usa `CREATE SCHEMA IF NOT EXISTS` y otorga al usuario del DW permisos sobre los tres schemas. Se monta en `/docker-entrypoint-initdb.d/`, por lo que PostgreSQL lo ejecuta solo cuando el volumen de datos está vacío.
 

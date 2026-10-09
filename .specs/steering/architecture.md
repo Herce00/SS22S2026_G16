@@ -52,26 +52,47 @@ Archivos CSV ──────┘                                              
 8. **Sin credenciales en el repositorio.** Todo parámetro de conexión entra por variables de entorno o conexiones de Airflow.
 9. **Reproducible con un comando.** `docker compose up` debe levantar el entorno completo desde cero.
 10. **Airflow orquesta, no transforma.** Las tareas invocan scripts Python y comandos dbt; la lógica no vive dentro del DAG.
-11. **El diseño no depende del archivo de datos.** La ingesta se guía por configuración: la llegada de los datos reales cambia configuración y contrato, no código.
+11. **La ingesta se guía por configuración.** Un archivo declara cada fuente y su tabla `raw` destino; agregar o cambiar una fuente modifica configuración y contrato, no código.
+
+## Datos oficiales
+
+El curso entregó los datos el 2026-10-08. Están en `Proyecto1/data/` y son sintéticos.
+
+| Archivo | Rol | Contenido | Filas |
+|---------|-----|-----------|------:|
+| `sgfood_oltp.sql` | Fuente transaccional | Script PostgreSQL: schema `oltp_sgfood` con 7 tablas, claves y restricciones | — |
+| ↳ `sucursal`, `categoria`, `marca` | Catálogos | | 6, 8, 10 |
+| ↳ `producto`, `cliente` | Maestros | | 80, 250 |
+| ↳ `venta`, `venta_detalle` | Transacciones | | 1200, 3209 |
+| `inventario_bodega.csv` | Fuente externa | Inventario mensual por sucursal y producto | 3840 |
+| `proveedores_precios.csv` | Fuente externa | Costos y plazos por proveedor | 103 |
+| `devoluciones.csv` | Fuente externa | Devoluciones por venta y producto | 80 |
+| `metas_ventas.csv` | Fuente externa | Metas mensuales por sucursal | 48 |
+| `promociones.csv` | Fuente externa | Campañas por categoría | 30 |
+| `casos_calidad_opcionales.csv` | Pruebas | 10 datos inválidos intencionales; el catálogo indica no cargarlos en la corrida principal | 10 |
+| `catalogo_insumos_sgfood.xlsx` | Documentación | Resumen de archivos y diccionario de 68 campos | — |
+
+Formato de los CSV: separador coma, UTF-8 **con BOM**, fin de línea CRLF, una fila de encabezado. Deben leerse como `utf-8-sig`; de lo contrario el nombre de la primera columna queda con un carácter invisible.
 
 ## Decisiones acordadas
 
 | # | Tema | Decisión | Motivo |
 |---|------|----------|--------|
-| D1 | Datos de origen | Ingesta guiada por un archivo de configuración que declara cada fuente y su tabla `raw` destino. Hasta recibir el archivo oficial se trabaja con datos de muestra mínimos. | El curso entregará los datos más adelante y pide no esperar para avanzar. |
-| D2 | Motor de la BD fuente | PostgreSQL en un contenedor separado del DW, poblado por un script de inicialización. | Un solo motor y un solo driver. |
-| D3 | Contrato raw | Vive en `Proyecto1/docs/contrato_raw.md`. Inicia como `v0` (borrador) y pasa a `v1` al llegar los datos reales. | B puede desarrollar `sources.yml` y `staging` desde el primer día. |
-| D4 | Tipado en `raw` | Todas las columnas de negocio como `TEXT`, más las columnas de auditoría `_loaded_at` y `_source`. El tipado se hace en `staging`. | Sin conocer los datos, una carga a texto no falla por formatos inesperados. |
-| D5 | Estrategia de carga | Truncar y recargar dentro de una transacción. | Idempotente sin depender de claves o fechas aún desconocidas. |
+| D1 | Datos de origen | Ingesta guiada por un archivo de configuración que declara cada fuente y su tabla `raw` destino. Se trabaja directamente con los datos oficiales; no hay datos de muestra. | Agregar una fuente no requiere tocar código. |
+| D2 | Motor de la BD fuente | PostgreSQL en un contenedor separado del DW, poblado con `sgfood_oltp.sql` al inicializarse. Las tablas viven en el schema `oltp_sgfood`. | Es el formato en que el curso entregó la fuente. |
+| D3 | Contrato raw | Vive en `Proyecto1/docs/contrato_raw.md` y se redacta directamente como `v1` a partir del diccionario oficial. | Los datos ya son conocidos; el borrador `v0` dejó de ser necesario. |
+| D4 | Tipado en `raw` | Todas las columnas de negocio como `TEXT`, más las columnas de auditoría `_loaded_at` y `_source`. El tipado se hace en `staging`. | Permite que valores inválidos lleguen a `raw` y los detecten las pruebas dbt, en lugar de romper la carga. |
+| D5 | Estrategia de carga | Truncar y recargar dentro de una transacción. | Idempotente y suficiente para el volumen (unas 8.800 filas). |
 | D6 | dbt desde Airflow | `BashOperator` con `dbt run` y `dbt test`. | Sin dependencias adicionales. |
-| D7 | Versiones | Se verifican contra la documentación oficial al construir el entorno y se fijan en [tech-stack.md](tech-stack.md). | Evitar incompatibilidades entre Airflow, Python y dbt. |
+| D7 | Versiones | Verificadas y fijadas en [tech-stack.md](tech-stack.md). | Evitar incompatibilidades entre Airflow, Python y dbt. |
+| D8 | Casos de calidad opcionales | `casos_calidad_opcionales.csv` no se carga en la corrida principal. Su uso para probar la calidad de datos es opcional y lo define B. | Lo indica el catálogo oficial; mezclarlos alteraría las cifras reales. |
 
 Consecuencias que cada rol debe tener presentes:
 
-- **D1 — datos de muestra.** Sirven solo para desarrollar. No pueden aparecer en la evidencia ni en las cifras del README.
-- **D1 y D2 — forma del archivo oficial.** El enunciado exige una BD transaccional y además archivos CSV. Si el curso entrega un único archivo plano, A lo divide: una parte se siembra en la BD fuente y otra se conserva como CSV.
-- **D4 — tipado.** Todo el trabajo de conversión de tipos y manejo de formatos recae en los modelos `staging` de B.
+- **D2 — restricciones en la fuente.** La base transaccional tiene claves y `CHECK`, así que no admite datos inválidos. Los casos de calidad solo pueden inyectarse en `raw` o en los CSV.
+- **D4 — tipado.** Todo el trabajo de conversión de tipos y manejo de formatos recae en los modelos `staging` de B. El diccionario oficial indica el tipo esperado de cada campo.
 - **D5 — incremental.** B puede usar materializaciones incrementales en dbt aunque la carga a `raw` sea completa.
+- **Cifras y evidencia.** Todo conteo citado en el README o en la evidencia debe salir de una ejecución real sobre estos datos.
 
 Cambiar una decisión acordada es un tema de zona amarilla.
 
@@ -83,7 +104,7 @@ Cambiar una decisión acordada es un tema de zona amarilla.
 | `Proyecto1/sql/ddl/` | A | Schemas `raw`, `staging`, `marts` y tablas de `raw` |
 | `Proyecto1/python/` | A | Extracción, carga de CSV, limpieza técnica, configuración de fuentes |
 | `Proyecto1/airflow/dags/` | A | DAG: tareas, dependencias, reintentos, errores, logs, programación |
-| Datos de muestra y script de inicialización de la BD fuente | A | Insumos de desarrollo hasta recibir el archivo oficial |
+| `Proyecto1/data/` | A | Datos oficiales: script de la BD fuente, CSV y catálogo. No se editan a mano |
 | `Proyecto1/dbt_project/**` | B | `sources.yml`, modelos, pruebas, macros, documentación dbt |
 | Diseño del modelo dimensional | B | Hechos, dimensiones, granularidad, bus matrix |
 | `Proyecto1/sql/validaciones/` y consultas analíticas | B | Conteos, integridad referencial, resultados de negocio |
@@ -135,17 +156,19 @@ Se reporta al dueño con evidencia (archivo, línea, consulta o comando que lo r
 
 | # | Punto | Entrega A | Entrega B |
 |---|-------|-----------|-----------|
-| 1 | Contrato raw `v0` | Propuesta de tablas y columnas | Validación |
-| 2 | Entorno | `docker compose up` funcional con los tres schemas creados | Proyecto dbt que se conecta al DW |
-| 3 | Datos de muestra en `raw` | DAG de carga funcionando | `sources.yml`, `staging` y `marts` sobre la muestra |
+| 1 | Entorno | `docker compose up` funcional con los tres schemas creados | Proyecto dbt que se conecta al DW |
+| 2 | Contrato raw `v1` | Tablas y columnas de `raw`, DDL y BD fuente poblada | Validación; `sources.yml` |
+| 3 | Datos en `raw` | Carga con Python de las 12 tablas | `staging` y `marts` sobre datos reales |
 | 4 | dbt en el DAG | Tareas `dbt run` y `dbt test` | Proyecto ejecutable y comandos definidos |
 | 5 | Validaciones | Tarea de conteos en el DAG | Consultas de validación y analíticas |
-| 6 | Datos oficiales | Configuración de fuentes y contrato `v1` | Ajuste de modelos y pruebas |
-| 7 | Cierre | README de ingesta y evidencias | README de modelado, evidencias, `dbt docs` |
+| 6 | Cierre | README de ingesta y evidencias | README de modelado, evidencias, `dbt docs` |
+
+Features previstas del rol A, en orden: `entorno-base` (terminada), `contrato-raw`, `ingesta-raw`, `dag-orquestacion`.
 
 ## Pendientes
 
-- [ ] Recibir el archivo de datos oficial y definir cómo se reparte entre BD transaccional y CSV.
-- [ ] Redactar y validar el contrato raw `v0`.
+- [x] Recibir el archivo de datos oficial.
+- [x] Redactar y validar el contrato raw `v1`.
 - [x] Verificar y fijar las versiones del entorno (D7).
+- [ ] Decidir si se usan los casos de calidad opcionales y cómo (B).
 - [ ] Definir dónde se materializa la capa intermediate (B).

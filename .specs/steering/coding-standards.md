@@ -60,7 +60,7 @@ Los commits de ambos integrantes son la evidencia del trabajo en pareja que pide
 | Tareas del DAG | verbo + objeto | `load_csv_productos`, `dbt_run`, `validate_counts` |
 | Variables de entorno | mayúsculas con prefijo por servicio | `DW_HOST`, `SRC_HOST` |
 
-Los nombres de entidades son ilustrativos hasta que exista el contrato raw. Los nombres de tablas y columnas de `raw` forman parte del contrato: no se renombran sin acuerdo.
+Los nombres de entidades provienen de los datos oficiales (ver [architecture.md](architecture.md)). Los nombres de tablas y columnas de `raw` forman parte del contrato: no se renombran sin acuerdo.
 
 ## Python (rol A)
 
@@ -129,7 +129,9 @@ B puede ajustar las convenciones internas de dbt; un cambio que afecte al DAG o 
 - Documentación del proyecto en español, tono técnico y neutro.
 - Cada sección del README tiene un dueño (mapa de propiedad en [architecture.md](architecture.md)); el otro integrante la revisa.
 - La evidencia va en `Proyecto1/evidencia/` con nombres descriptivos: `dag_ejecucion_exitosa.png`, `dbt_test_resultado.png`.
-- No se inventan cifras: todo conteo o resultado citado debe provenir de una ejecución real sobre los datos oficiales, nunca sobre los datos de muestra.
+- No se inventan cifras: todo conteo o resultado citado debe provenir de una ejecución real sobre los datos oficiales de `Proyecto1/data/`.
+- Los archivos de `Proyecto1/data/` se versionan tal como los entregó el curso y no se editan a mano.
+- Los CSV se leen como `utf-8-sig` porque incluyen BOM.
 
 ## Antes de abrir un pull request
 
