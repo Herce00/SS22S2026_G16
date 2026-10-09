@@ -18,6 +18,10 @@ Un `docker-compose.yml` con tres instancias PostgreSQL y Airflow en modo de ejec
 | E6 | Conexiones de Airflow por variables `AIRFLOW_CONN_*` | Crearlas en la interfaz o con un script | Sin pasos manuales y sin estado fuera del repositorio |
 | E7 | Pruebas con `pytest` que invocan `docker compose` | Verificación manual | Permite trabajar con TDD y deja evidencia repetible |
 | E8 | Sin `airflow-triggerer` | Incluirlo como en el compose oficial | El proyecto no usa operadores diferibles |
+| E9 | `FabAuthManager` para autenticación y roles RBAC | `SimpleAuthManager` por defecto de Airflow 3 | `SimpleAuthManager` no soporta roles FAB ni creación por CLI (`airflow users create`) |
+| E10 | Esquema `postgres://` en conexiones de Airflow | `postgresql+psycopg://` | Permite que Airflow resuelva `conn_type: postgres` y cargue los hooks y operadores oficiales de PostgreSQL |
+| E11 | Execution API y secreto JWT compartido | Valores por defecto a localhost | En Airflow 3 los workers de `LocalExecutor` comunican con el api-server vía HTTP; sin URL ni JWT la ejecución de tareas falla |
+| E12 | Exclusión de pruebas lentas/destructivas por defecto | Ejecutar ciclo `down -v` en cada corrida | Previene la eliminación accidental de volúmenes persistidos durante corridas rutinarias de prueba |
 
 ## Versiones
 
@@ -132,8 +136,9 @@ Interfaz entre el entorno (rol A) y sus consumidores: scripts Python, DAGs y `pr
 | `AIRFLOW_ADMIN_PASSWORD` | `cambiar` | Sí | Contraseña de la interfaz |
 | `AIRFLOW_PORT` | `8080` | Sí | Puerto de la interfaz en el host |
 | `AIRFLOW_UID` | `50000` | No | Usuario del sistema dentro del contenedor |
+| `AIRFLOW_JWT_SECRET` | `cambiar` | Sí | Secreto JWT para comunicación interna entre Task SDK y Execution API |
 
-Las variables obligatorias se declaran en el compose con la sintaxis `${VAR:?mensaje}` para que su ausencia detenga el arranque (requisito R1.3).
+Las variables obligatorias se declaran en el compose con la sintaxis `${VAR:?mensaje}` para que su ausencia detenga el arranque (requisito R1.3). Ninguna contraseña ni usuario admite valores por defecto literales o fallback con `:-`.
 
 ### Variables visibles dentro de los contenedores de Airflow
 

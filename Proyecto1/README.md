@@ -95,10 +95,11 @@ psql -h localhost -p 5433 -U dw_user -d sgfood_dw
 - **Usuario:** `src_user`
 
 #### Interfaz Web y API de Apache Airflow
-- **URL:** `http://localhost:8080` (o el puerto configurado en `AIRFLOW_PORT`)
-- **Usuario:** Valor configurado en `AIRFLOW_ADMIN_USER` (por defecto `admin`)
-- **Contraseña:** Valor configurado en `AIRFLOW_ADMIN_PASSWORD`
-- **Endpoint de salud:** `http://localhost:8080/api/v2/monitor/health`
+- **URL Web UI:** `http://localhost:8080` (o el puerto configurado en `AIRFLOW_PORT`)
+- **Autenticación Web:** Gestionada por FAB (`FabAuthManager`). El formulario de login solicita el usuario (`AIRFLOW_ADMIN_USER`) y contraseña (`AIRFLOW_ADMIN_PASSWORD`) configurados en `.env`.
+- **Autenticación REST API (Airflow 3):** Para consumir los endpoints de la API (por ejemplo `/api/v2/dags`), obtenga primero un token JWT mediante `POST /auth/token` enviando `{"username": "<usuario>", "password": "<contraseña>"}` con cabecera `Content-Type: application/json`. Luego envíe el token devuelto en la cabecera `Authorization: Bearer <access_token>`.
+- **Endpoint de salud:** `http://localhost:8080/api/v2/monitor/health` (o el puerto configurado en `AIRFLOW_PORT`)
+- **Execution API interna:** Los workers y el scheduler se comunican con el api-server a través de `http://airflow-apiserver:8080/execution/` autenticados mediante `AIRFLOW_JWT_SECRET`.
 
 ### 6. Ejecución de pruebas automatizadas
 

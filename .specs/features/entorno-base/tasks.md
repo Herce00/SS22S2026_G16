@@ -150,9 +150,9 @@ Las versiones ya están elegidas en [design.md](design.md); esta tarea comprueba
 
 ## Definición de terminado
 
-- [ ] Todos los escenarios Gherkin de [requirements.md](requirements.md) pasan.
-- [ ] `pytest tests/entorno` pasa completo en un entorno limpio.
-- [ ] Ningún archivo versionado contiene credenciales ni la etiqueta `latest`.
+- [x] Todos los escenarios Gherkin de [requirements.md](requirements.md) pasan.
+- [x] `pytest tests/entorno` pasa completo en un entorno limpio.
+- [x] Ningún archivo versionado contiene credenciales ni la etiqueta `latest`.
 - [ ] B confirmó que puede conectarse al DW y ver los tres schemas.
 - [ ] Pull request de `feat/ingesta-airflow` hacia `main` abierto para revisión de B.
 
