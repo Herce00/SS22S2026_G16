@@ -80,16 +80,16 @@ Toda la feature es zona verde del rol A. No requiere acuerdos previos con B.
 
 ## T5 — Carga de una tabla
 
-- [ ] **Rojo (estática):** los servicios de Airflow del compose definen `PYTHONPATH` con `/opt/airflow/python`.
-- [ ] **Rojo (integración):** `tests/ingesta/test_carga_tabla.py`:
+- [x] **Rojo (estática):** los servicios de Airflow del compose definen `PYTHONPATH` con `/opt/airflow/python`.
+- [x] **Rojo (integración):** `tests/ingesta/test_carga_tabla.py`:
   - `python -m sgfood_ingesta --tabla devoluciones` dentro de `airflow-scheduler` termina con código 0 y `raw.devoluciones` queda con 80 filas.
   - `python -m sgfood_ingesta --tabla sucursal` termina con código 0 y `raw.sucursal` queda con 6 filas.
   - Cargar una tabla no cambia la cantidad de filas de las demás.
   - `--tabla tabla_inexistente` termina con código 2 y lista las tablas válidas.
   - `--listar` muestra las 12 tablas.
   - La salida registra origen, destino, filas leídas, filas cargadas y duración, y no contiene la contraseña del DW.
-- [ ] **Verde:** implementar `carga.py`, `ingesta.py`, `cli.py` y `__main__.py`; agregar `PYTHONPATH` al compose.
-- [ ] Cerrar el punto abierto de [design.md](design.md) sobre `COPY` y valores `None`.
+- [x] **Verde:** implementar `carga.py`, `ingesta.py`, `cli.py` y `__main__.py`; agregar `PYTHONPATH` al compose.
+- [x] Cerrar el punto abierto de [design.md](design.md) sobre `COPY` y valores `None`.
 
 **Verificación:** recrear los servicios de Airflow y `pytest tests/ingesta -k "carga_tabla"`.
 **Commit:** `feat(p1-ingesta): load a single source into raw`

@@ -257,4 +257,4 @@ Fuera de `Proyecto1/` solo se editan [tech-stack.md](../../steering/tech-stack.m
 ## Puntos abiertos
 
 - [x] Retiro de `pandas`: aprobado el 2026-10-09.
-- [ ] Confirmar la forma exacta de `COPY` con `psycopg` 3 para valores `None`.
+- [x] Confirmar la forma exacta de `COPY` con `psycopg` 3 para valores `None`: verificado con `cur.copy()` y `copy.write_row()`, serializa automáticamente `None` como `NULL` (`\N`) en formato de texto.

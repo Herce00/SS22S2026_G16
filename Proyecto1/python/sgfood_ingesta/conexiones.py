@@ -80,12 +80,13 @@ def conectar_dw() -> psycopg.Connection:
 def conectar_src() -> psycopg.Connection:
     """Abre conexión con la fuente en modo solo lectura (read_only=True)."""
     params = obtener_parametros_src()
-    return psycopg.connect(
+    conn = psycopg.connect(
         host=params.host,
         port=params.port,
         dbname=params.dbname,
         user=params.user,
         password=params.password,
         autocommit=False,
-        read_only=True,
     )
+    conn.read_only = True
+    return conn
