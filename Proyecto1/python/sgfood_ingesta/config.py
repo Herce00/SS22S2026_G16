@@ -102,3 +102,7 @@ def cargar_configuracion(ruta: str | None = None) -> list[Fuente]:
         fuentes.append(fuente)
 
     return fuentes
+
+
+# Alias para interfaz pública
+listar_fuentes = cargar_configuracion

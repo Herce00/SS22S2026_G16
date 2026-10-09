@@ -67,13 +67,13 @@ Toda la feature es zona verde del rol A. No requiere acuerdos previos con B.
 
 ## T4 — Consulta de extracción y conexiones
 
-- [ ] **Rojo:** pruebas unitarias:
+- [x] **Rojo:** pruebas unitarias:
   - La consulta generada para una fuente `postgres` convierte cada columna con `::text`, respeta el orden declarado y califica la tabla con su schema.
   - Un nombre con comillas o punto y coma queda escapado como identificador y no altera la consulta.
   - `conexiones.py` arma los parámetros del DW y de la fuente desde el entorno.
   - Una variable faltante produce `ConfiguracionInvalida` nombrando la variable.
   - La representación en texto de los parámetros no incluye la contraseña.
-- [ ] **Verde:** implementar la construcción de la consulta en `extraccion.py` y `conexiones.py`.
+- [x] **Verde:** implementar la construcción de la consulta en `extraccion.py` y `conexiones.py`.
 
 **Verificación:** `pytest tests/ingesta -k "extraccion_postgres or conexiones"`.
 **Commit:** `feat(p1-ingesta): build extraction query and connection settings`

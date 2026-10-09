@@ -3,11 +3,64 @@ import csv
 import os
 from typing import Iterator
 
+from psycopg import sql
+
+from sgfood_ingesta.config import Fuente
 from sgfood_ingesta.errores import (
     ConfiguracionInvalida,
     EncabezadoInvalido,
     FilaInvalida,
 )
+
+
+def construir_consulta_extraccion(
+    fuente_o_origen: Fuente | str,
+    columnas: tuple[str, ...] | None = None,
+) -> sql.Composed:
+    """Construye la consulta SELECT para extraer datos desde PostgreSQL.
+
+    - Convierte cada columna con ::text usando sql.Identifier.
+    - Respeta el orden declarado de las columnas.
+    - Califica la tabla con su schema usando sql.Identifier.
+    - Escapa identificadores especiales para prevenir inyección SQL.
+    - No incluye ORDER BY ni SELECT *.
+    """
+    if isinstance(fuente_o_origen, Fuente):
+        origen = fuente_o_origen.origen
+        cols = fuente_o_origen.columnas
+    else:
+        origen = fuente_o_origen
+        if columnas is None:
+            raise ValueError("Se requieren columnas si se pasa origen como string")
+        cols = columnas
+
+    partes = origen.split(".", 1)
+    if len(partes) != 2:
+        raise ValueError(f"El origen postgres debe tener formato 'schema.tabla', recibido: '{origen}'")
+    schema, tabla = partes[0], partes[1]
+
+    col_items = [
+        sql.SQL("{col}::text").format(col=sql.Identifier(c))
+        for c in cols
+    ]
+    query = sql.SQL("SELECT {cols} FROM {schema}.{tabla}").format(
+        cols=sql.SQL(", ").join(col_items),
+        schema=sql.Identifier(schema),
+        tabla=sql.Identifier(tabla),
+    )
+    return query
+
+
+def extraer_filas_postgres(
+    conn,
+    fuente: Fuente,
+) -> Iterator[tuple[str | None, ...]]:
+    """Ejecuta la consulta construida y produce tuplas de texto desde PostgreSQL."""
+    query = construir_consulta_extraccion(fuente)
+    with conn.cursor() as cur:
+        cur.execute(query)
+        for row in cur:
+            yield tuple(row)
 
 
 def extraer_filas_csv(
