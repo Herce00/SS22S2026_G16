@@ -156,14 +156,14 @@ Se reporta al dueño con evidencia (archivo, línea, consulta o comando que lo r
 
 | # | Punto | Entrega A | Entrega B |
 |---|-------|-----------|-----------|
-| 1 | Entorno | `docker compose up` funcional con los tres schemas creados | Proyecto dbt que se conecta al DW |
-| 2 | Contrato raw `v1` | Tablas y columnas de `raw`, DDL y BD fuente poblada | Validación; `sources.yml` |
-| 3 | Datos en `raw` | Carga con Python de las 12 tablas | `staging` y `marts` sobre datos reales |
+| 1 | Entorno | `docker compose up` funcional con los tres schemas creados (entregado) | Proyecto dbt que se conecta al DW |
+| 2 | Contrato raw `v1` | Tablas y columnas de `raw`, DDL y BD fuente poblada (entregado) | Validación; `sources.yml` |
+| 3 | Datos en `raw` | Carga con Python de las 12 tablas (entregado) | `staging` y `marts` sobre datos reales |
 | 4 | dbt en el DAG | Tareas `dbt run` y `dbt test` | Proyecto ejecutable y comandos definidos |
 | 5 | Validaciones | Tarea de conteos en el DAG | Consultas de validación y analíticas |
 | 6 | Cierre | README de ingesta y evidencias | README de modelado, evidencias, `dbt docs` |
 
-Features previstas del rol A, en orden: `entorno-base` (terminada), `contrato-raw`, `ingesta-raw`, `dag-orquestacion`.
+Features previstas del rol A, en orden: `entorno-base` (terminada), `contrato-raw` (terminada), `ingesta-raw` (terminada), `dag-orquestacion`.
 
 ## Pendientes
 

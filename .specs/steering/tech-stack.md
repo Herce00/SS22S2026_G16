@@ -27,7 +27,7 @@ No los exige el enunciado; son decisiones de la pareja (ver "Decisiones acordada
 | Docker Compose | Levanta DW, BD fuente y Airflow | A | Reproducibilidad y manual de implementación corto |
 | Motor de la BD fuente | PostgreSQL en contenedor separado del DW | A | Un solo motor y un solo driver |
 | Driver de base de datos | `psycopg` | A | Soporta `COPY` para carga masiva |
-| Lectura de CSV | `pandas` | A | Manejo de codificación y delimitadores |
+| Lectura de CSV | Biblioteca estándar (`csv`) | A | Lectura directa en streaming sin dependencias pesadas; `pandas` retirado |
 | Ejecución de dbt desde Airflow | `BashOperator` con `dbt run` y `dbt test` | A implementa, B define los comandos | Sin dependencias adicionales |
 | Configuración | Archivo `.env` + conexiones y variables de Airflow | Ambos | Cubre el punto opcional de parametrización |
 | Conexión de dbt | `profiles.yml` que lee las mismas variables de entorno | B | Una sola fuente de configuración |

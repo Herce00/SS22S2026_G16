@@ -155,22 +155,22 @@ Toda la feature es zona verde del rol A. No requiere acuerdos previos con B.
 
 ## T10 — Documentación
 
-- [ ] Agregar al `README.md` la sección de scripts Python: estructura del paquete, flujo de una tabla, comandos, códigos de salida, limpieza técnica aplicada y manejo de fallos.
-- [ ] Actualizar [tech-stack.md](../../steering/tech-stack.md): lectura de CSV con la biblioteca estándar y retiro de `pandas`.
-- [ ] Marcar el punto de integración 3 como entregado en [architecture.md](../../steering/architecture.md).
-- [ ] Marcar en este documento solo lo observado.
+- [x] Agregar al `README.md` la sección de scripts Python: estructura del paquete, flujo de una tabla, comandos, códigos de salida, limpieza técnica aplicada y manejo de fallos.
+- [x] Actualizar [tech-stack.md](../../steering/tech-stack.md): lectura de CSV con la biblioteca estándar y retiro de `pandas`.
+- [x] Marcar el punto de integración 3 como entregado en [architecture.md](../../steering/architecture.md).
+- [x] Marcar en este documento solo lo observado.
 
 **Verificación:** un integrante sigue el README en un clon limpio y llega a las 8864 filas en `raw`.
 **Commit:** `docs(p1-ingesta): document python ingestion`
 
 ## Definición de terminado
 
-- [ ] Todos los escenarios Gherkin de [requirements.md](requirements.md) pasan.
-- [ ] `pytest tests/entorno tests/contrato tests/ingesta` pasa completo en un entorno limpio.
-- [ ] `raw` contiene 8864 filas repartidas según el contrato.
-- [ ] El código no contiene nombres de tablas ni de columnas de negocio escritos a mano.
-- [ ] Ningún archivo de `data/` fue modificado.
-- [ ] La evidencia de la carga está en `evidencia/`.
+- [x] Todos los escenarios Gherkin de [requirements.md](requirements.md) pasan.
+- [x] `pytest tests/entorno tests/contrato tests/ingesta` pasa completo en un entorno limpio.
+- [x] `raw` contiene 8864 filas repartidas según el contrato.
+- [x] El código no contiene nombres de tablas ni de columnas de negocio escritos a mano.
+- [x] Ningún archivo de `data/` fue modificado.
+- [x] La evidencia de la carga está en `evidencia/`.
 
 ## Fuera de esta feature
 

@@ -121,9 +121,73 @@ Los datos de origen del proyecto residen en `data/` y se versionan de forma bina
 - **Configuración centralizada:** [python/config/fuentes.yml](python/config/fuentes.yml) actúa como la única fuente de verdad consumible por código para la definición de fuentes, tablas y columnas.
 - **DDL de tablas raw:** [sql/ddl/02_raw_tables.sql](sql/ddl/02_raw_tables.sql) crea las 12 tablas en `raw` tipadas como `TEXT` con columnas de auditoría, sin claves ni restricciones que impidan la auditoría en dbt.
 
-### 7. Ejecución de pruebas automatizadas
+### 7. Ingesta Técnica de Datos (sgfood_ingesta)
 
-El proyecto cuenta con un arnés de pruebas automatizadas en `tests/entorno/` y `tests/contrato/` utilizando `pytest`.
+El paquete `Proyecto1/python/sgfood_ingesta/` implementa la extracción y carga técnica de las 12 fuentes de datos hacia el schema `raw` del Data Warehouse `sgfood_dw`, garantizando fidelidad e idempotencia.
+
+#### Estructura del paquete
+
+```
+Proyecto1/python/sgfood_ingesta/
+├── __init__.py      # Exporta la interfaz pública (listar_fuentes, cargar_fuente, cargar_todas)
+├── __main__.py      # Punto de entrada para invocación con python -m sgfood_ingesta
+├── cli.py           # CLI con argparse, configuración de logging y códigos de salida (0, 1, 2)
+├── config.py        # Carga inmutable y validación estricta de python/config/fuentes.yml
+├── conexiones.py    # Gestión segura de parámetros y conexiones psycopg (enmascara credenciales)
+├── extraccion.py    # Extracción streaming con psycopg.sql (Postgres) y csv stdlib (utf-8-sig)
+├── carga.py         # Carga transaccional al DW: TRUNCATE + COPY FROM STDIN + verificación de conteos
+└── errores.py       # Jerarquía de excepciones de dominio (heredan de ErrorIngesta)
+```
+
+#### Flujo de carga por tabla
+
+1. **Resolución:** Lee la especificación de la tabla desde `fuentes.yml` sin nombres de negocio escritos a mano en el código.
+2. **Extracción Streaming:**
+   - **PostgreSQL:** Construye una consulta parametrizada con `psycopg.sql.Identifier`, proyectando cada columna con `::text` sobre la base fuente en modo solo lectura (`read_only=True`).
+   - **Archivos CSV:** Lee línea por línea en streaming usando el módulo estándar `csv` con codificación `utf-8-sig`. Valida el encabezado contra el contrato y detecta inconsistencias en número de columnas con reporte exacto de línea.
+3. **Limpieza técnica aplicada:**
+   - La **única transformación** realizada en Python es la conversión de cadenas vacías `""` a `None` (SQL `NULL`).
+   - Se preservan espacios en blanco y no se efectúan conversiones de tipos en Python (todas las columnas de negocio residen como `TEXT` en `raw`, delegando auditorías y conversiones a dbt en la capa `staging`).
+   - No se utiliza `pandas` (eliminado de los requisitos para máxima velocidad y ligereza).
+4. **Carga Transaccional en Data Warehouse:**
+   - Se ejecuta dentro de un bloque de transacción en `sgfood_dw` con `autocommit=False`.
+   - Se vacía la tabla con `TRUNCATE TABLE raw.<tabla>`.
+   - Se cargan las filas vía `COPY raw.<tabla> (...) FROM STDIN`. La biblioteca `psycopg` 3 (`write_row`) serializa de forma nativa los valores `None` a `NULL` (`\N`).
+   - Se agregan las columnas de auditoría: `_loaded_at` (marca de tiempo compartida en UTC) y `_source` (ruta u origen exacto declarado).
+   - Se ejecuta una verificación antes de confirmar: `SELECT count(*) FROM raw.<tabla>`. Si el total coincide exactamente con las filas leídas, se hace `COMMIT`; si difiere, se lanza `ConteoInconsistente` y se revierte la transacción (`ROLLBACK`).
+5. **Manejo de fallos y aislamiento:**
+   - Si ocurre un fallo en una tabla, la transacción se revierte por completo preservando los datos previos de esa tabla.
+   - En una carga completa de las 12 tablas, si una tabla posterior falla, las tablas ya confirmadas con anterioridad permanecen persistidas en el DW.
+
+#### Comandos de ejecución
+
+Desde el host (a través de los contenedores Docker):
+
+```bash
+# Carga completa de las 12 tablas con timestamp auditado compartido (8.864 filas en total)
+docker compose exec airflow-scheduler python -m sgfood_ingesta
+
+# Carga de una tabla individual
+docker compose exec airflow-scheduler python -m sgfood_ingesta --tabla devoluciones
+
+# Listado de fuentes configuradas
+docker compose exec airflow-scheduler python -m sgfood_ingesta --listar
+
+# Ejecución desacoplada en un contenedor efímero independiente
+docker compose run --rm airflow-scheduler python -m sgfood_ingesta
+```
+
+#### Códigos de salida
+
+| Código | Significado | Comportamiento |
+|:---:|---|---|
+| `0` | Éxito | Todas las cargas solicitadas se completaron y confirmaron. |
+| `1` | Fallo en carga | Error durante la extracción, discrepancia de conteo o archivo inexistente. La tabla afectada se revierte. |
+| `2` | Configuración / argumentos inválidos | Argumentos erróneos o tabla inexistente en `fuentes.yml`. |
+
+### 8. Ejecución de pruebas automatizadas
+
+El proyecto cuenta con un arnés de pruebas automatizadas en `tests/entorno/`, `tests/contrato/` y `tests/ingesta/` utilizando `pytest`.
 
 Para ejecutarlas desde el host:
 
@@ -132,14 +196,14 @@ Para ejecutarlas desde el host:
    pip install -r tests/requirements-dev.txt
    ```
 
-2. Ejecute las pruebas estáticas de contrato y configuración:
+2. Ejecute las pruebas estáticas de contrato, configuración e ingesta:
    ```bash
-   pytest tests/contrato tests/entorno -m "not integracion and not lenta"
+   pytest tests/contrato tests/entorno tests/ingesta -m "not integracion and not lenta"
    ```
 
-3. Ejecute la suite completa de integración de entorno y contrato:
+3. Ejecute la suite completa de integración (entorno, contrato e ingesta):
    ```bash
-   pytest tests/entorno tests/contrato
+   pytest tests/entorno tests/contrato tests/ingesta
    ```
 
 4. Para ejecutar de manera explícita la prueba de reinicio limpio (`down -v` y ciclo de reinicio de contenedores):
@@ -147,7 +211,7 @@ Para ejecutarlas desde el host:
    pytest tests/entorno/test_reinicio.py -m lenta
    ```
 
-### 8. Reinicio a estado limpio
+### 9. Reinicio a estado limpio
 
 Para restablecer el entorno borrando volúmenes y datos persistidos:
 
@@ -159,7 +223,7 @@ docker compose up -d
 > [!IMPORTANT]
 > **Comportamiento de inicialización de volúmenes:** Los scripts ubicados en `/docker-entrypoint-initdb.d/` tanto en `dw` (`01_schemas.sql`, `02_raw_tables.sql`) como en `src` (`01_oltp.sql`) se ejecutan **únicamente cuando sus volúmenes nombrados (`dw_data` y `src_data`) están completamente vacíos**. Si se agregan o modifican scripts DDL con un entorno ya levantado, es obligatorio ejecutar `docker compose down -v` para recrear las bases de datos desde cero, o bien aplicar los scripts manualmente con `psql`.
 
-### 9. Problemas frecuentes y resolución
+### 10. Problemas frecuentes y resolución
 
 - **Puerto del host ocupado (Bind failed / port is already allocated):**
   Si puertos como 5433, 5434 u 8080 están ocupados por otros servicios locales en el host, cambie los valores correspondientes en su archivo `.env` local (por ejemplo `DW_PORT=5443`, `SRC_PORT=5444`, `AIRFLOW_PORT=8089`). No modifique `docker-compose.yml`.
