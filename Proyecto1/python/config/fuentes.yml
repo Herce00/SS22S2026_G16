@@ -1,0 +1,129 @@
+version: 1
+fuentes:
+  - tabla_raw: sucursal
+    tipo: postgres
+    origen: oltp_sgfood.sucursal
+    columnas:
+      - id_sucursal
+      - nombre
+      - ciudad
+      - departamento
+
+  - tabla_raw: categoria
+    tipo: postgres
+    origen: oltp_sgfood.categoria
+    columnas:
+      - id_categoria
+      - nombre
+
+  - tabla_raw: marca
+    tipo: postgres
+    origen: oltp_sgfood.marca
+    columnas:
+      - id_marca
+      - nombre
+
+  - tabla_raw: producto
+    tipo: postgres
+    origen: oltp_sgfood.producto
+    columnas:
+      - id_producto
+      - sku
+      - nombre
+      - id_categoria
+      - id_marca
+      - unidad_medida
+      - costo_base
+      - precio_lista
+      - activo
+
+  - tabla_raw: cliente
+    tipo: postgres
+    origen: oltp_sgfood.cliente
+    columnas:
+      - id_cliente
+      - nit
+      - nombre
+      - tipo_cliente
+      - municipio
+      - departamento
+      - fecha_alta
+
+  - tabla_raw: venta
+    tipo: postgres
+    origen: oltp_sgfood.venta
+    columnas:
+      - id_venta
+      - fecha
+      - id_cliente
+      - id_sucursal
+      - canal
+      - metodo_pago
+      - estado
+
+  - tabla_raw: venta_detalle
+    tipo: postgres
+    origen: oltp_sgfood.venta_detalle
+    columnas:
+      - id_detalle
+      - id_venta
+      - id_producto
+      - cantidad
+      - precio_unitario
+      - descuento
+      - subtotal
+
+  - tabla_raw: inventario_bodega
+    tipo: csv
+    origen: inventario_bodega.csv
+    columnas:
+      - fecha_corte
+      - id_sucursal
+      - id_producto
+      - stock_disponible
+      - stock_minimo
+      - stock_maximo
+      - lote
+      - fecha_vencimiento
+
+  - tabla_raw: proveedores_precios
+    tipo: csv
+    origen: proveedores_precios.csv
+    columnas:
+      - id_proveedor
+      - proveedor
+      - id_producto
+      - costo_proveedor
+      - plazo_dias
+      - fecha_vigencia
+
+  - tabla_raw: devoluciones
+    tipo: csv
+    origen: devoluciones.csv
+    columnas:
+      - id_devolucion
+      - fecha
+      - id_venta
+      - id_producto
+      - cantidad
+      - motivo
+
+  - tabla_raw: metas_ventas
+    tipo: csv
+    origen: metas_ventas.csv
+    columnas:
+      - periodo
+      - id_sucursal
+      - meta_ventas
+      - meta_unidades
+
+  - tabla_raw: promociones
+    tipo: csv
+    origen: promociones.csv
+    columnas:
+      - id_promocion
+      - nombre
+      - fecha_inicio
+      - fecha_fin
+      - id_categoria
+      - porcentaje_descuento
