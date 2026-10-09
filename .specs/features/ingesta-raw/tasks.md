@@ -143,12 +143,12 @@ Toda la feature es zona verde del rol A. No requiere acuerdos previos con B.
 
 ## T9 — Arranque desde cero y evidencia
 
-- [ ] **Rojo (estática):** el healthcheck de `src` consulta `oltp_sgfood.venta_detalle`.
-- [ ] **Verde:** actualizar el healthcheck de `src`.
-- [ ] Ejecutar `docker compose down -v` y `docker compose up -d`, y luego `python -m sgfood_ingesta` dentro de `airflow-scheduler`.
-- [ ] Ejecutar la suite completa: `pytest tests/entorno tests/contrato tests/ingesta`, y la prueba lenta de forma explícita.
-- [ ] Ejecutar el paquete con `docker compose run --rm` sobre un contenedor nuevo, para comprobar que no depende del estado del scheduler.
-- [ ] Guardar en `evidencia/` el registro de la carga completa y el resultado de una consulta con el conteo por tabla de `raw`.
+- [x] **Rojo (estática):** el healthcheck de `src` consulta `oltp_sgfood.venta_detalle`.
+- [x] **Verde:** actualizar el healthcheck de `src`.
+- [x] Ejecutar `docker compose down -v` y `docker compose up -d`, y luego `python -m sgfood_ingesta` dentro de `airflow-scheduler`.
+- [x] Ejecutar la suite completa: `pytest tests/entorno tests/contrato tests/ingesta`, y la prueba lenta de forma explícita.
+- [x] Ejecutar el paquete con `docker compose run --rm` sobre un contenedor nuevo, para comprobar que no depende del estado del scheduler.
+- [x] Guardar en `evidencia/` el registro de la carga completa y el resultado de una consulta con el conteo por tabla de `raw`.
 
 **Verificación:** todas las pruebas pasan en un entorno limpio; los archivos de evidencia contienen la salida real.
 **Commit:** `feat(p1-ingesta): verify clean start load and add evidence`

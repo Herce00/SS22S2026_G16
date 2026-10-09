@@ -30,6 +30,21 @@ def test_compose_defines_pythonpath(proyecto1_dir):
         )
 
 
+def test_src_healthcheck_checks_venta_detalle(proyecto1_dir):
+    """Verifica que el healthcheck de src compruebe que oltp_sgfood.venta_detalle tiene filas."""
+    compose_path = os.path.join(proyecto1_dir, "docker-compose.yml")
+    with open(compose_path, "r", encoding="utf-8") as f:
+        compose = yaml.safe_load(f)
+
+    src_health = compose.get("services", {}).get("src", {}).get("healthcheck", {})
+    test_cmd = src_health.get("test", [])
+    test_str = " ".join(test_cmd) if isinstance(test_cmd, list) else str(test_cmd)
+
+    assert "venta_detalle" in test_str, (
+        f"El healthcheck de src debe comprobar oltp_sgfood.venta_detalle, encontrado: {test_str}"
+    )
+
+
 @pytest.mark.integracion
 def test_listar_fuentes_cli(proyecto1_dir):
     """--listar muestra las 12 fuentes configuradas y termina con código 0."""
