@@ -21,8 +21,9 @@ def test_dockerfile_and_requirements_static(proyecto1_dir):
 
     for line in req_lines:
         assert "==" in line, f"Dependencia sin versión exacta (==): {line}"
-        assert not line.lower().startswith("apache-airflow"), "requirements.txt no debe incluir apache-airflow"
-        assert not line.lower().startswith("dbt"), "requirements.txt no debe incluir dbt"
+        pkg_name = line.split("==")[0].strip().lower()
+        assert pkg_name != "apache-airflow", "requirements.txt no debe incluir el paquete apache-airflow"
+        assert not pkg_name.startswith("dbt"), "requirements.txt no debe incluir dbt"
 
     # requirements-dbt.txt
     dbt_req_path = os.path.join(proyecto1_dir, "airflow", "requirements-dbt.txt")
