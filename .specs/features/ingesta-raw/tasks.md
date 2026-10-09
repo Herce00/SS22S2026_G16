@@ -111,7 +111,7 @@ Toda la feature es zona verde del rol A. No requiere acuerdos previos con B.
 
 ## T7 — Fidelidad y representación
 
-- [ ] **Rojo (integración):** `tests/ingesta/test_fidelidad.py`:
+- [x] **Rojo (integración):** `tests/ingesta/test_fidelidad.py`:
   - Para cada fuente `postgres`, las filas de la tabla fuente convertidas a texto y las columnas de negocio de `raw` son iguales como conjuntos con multiplicidad, en ambos sentidos.
   - Para cada fuente `csv`, las filas leídas del archivo en la prueba y las de `raw` son iguales como conjuntos con multiplicidad.
   - `producto.activo` solo contiene `true` o `false`.
@@ -120,7 +120,7 @@ Toda la feature es zona verde del rol A. No requiere acuerdos previos con B.
   - `metas_ventas.periodo` cumple `YYYY-MM`.
   - Los nulos de `cliente.municipio` y `cliente.departamento` en `raw` son tantos como en la fuente.
   - Ninguna columna de negocio de ninguna tabla contiene una cadena vacía.
-- [ ] **Verde:** corregir lo que las pruebas revelen. Si todo pasa sin cambios, registrarlo.
+- [x] **Verde:** corregir lo que las pruebas revelen. Si todo pasa sin cambios, registrarlo.
 
 **Verificación:** `pytest tests/ingesta -k "fidelidad"`.
 **Commit:** `test(p1-ingesta): verify raw content matches sources`
