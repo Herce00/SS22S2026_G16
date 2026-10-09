@@ -33,12 +33,39 @@ def test_conexiones_airflow(proyecto1_dir):
     res_src = run_docker_compose(*cmd_test_src, cwd=proyecto1_dir)
     assert res_src.returncode == 0, f"Conexión a SRC desde Airflow falló: {res_src.stderr}"
 
-    # Verificar conexiones registradas en Airflow CLI
+    # Verificar conexiones registradas en Airflow CLI y su conn_type postgres
     res_conn_dw = run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "connections", "get", "sgfood_dw", cwd=proyecto1_dir)
     assert res_conn_dw.returncode == 0, f"Conexión sgfood_dw no encontrada: {res_conn_dw.stderr}"
+    assert "postgres " in res_conn_dw.stdout or "| postgres " in res_conn_dw.stdout or "conn_type: postgres" in res_conn_dw.stdout
 
     res_conn_src = run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "connections", "get", "sgfood_src", cwd=proyecto1_dir)
     assert res_conn_src.returncode == 0, f"Conexión sgfood_src no encontrada: {res_conn_src.stderr}"
+    assert "postgres " in res_conn_src.stdout or "| postgres " in res_conn_src.stdout or "conn_type: postgres" in res_conn_src.stdout
+
+    # Verificar que PostgresHook construido desde cada conn_id tiene conn_type postgres y ejecuta SELECT 1
+    cmd_hook_dw = [
+        "exec", "-T", "airflow-scheduler", "python", "-c",
+        "from airflow.providers.postgres.hooks.postgres import PostgresHook; "
+        "hook = PostgresHook(postgres_conn_id='sgfood_dw'); "
+        "conn_meta = hook.get_connection('sgfood_dw'); "
+        "assert conn_meta.conn_type == 'postgres', f'conn_type esperado postgres pero fue {conn_meta.conn_type}'; "
+        "records = hook.get_records('SELECT 1;'); "
+        "assert records[0][0] == 1"
+    ]
+    res_hook_dw = run_docker_compose(*cmd_hook_dw, cwd=proyecto1_dir)
+    assert res_hook_dw.returncode == 0, f"PostgresHook sgfood_dw falló: {res_hook_dw.stderr} {res_hook_dw.stdout}"
+
+    cmd_hook_src = [
+        "exec", "-T", "airflow-scheduler", "python", "-c",
+        "from airflow.providers.postgres.hooks.postgres import PostgresHook; "
+        "hook = PostgresHook(postgres_conn_id='sgfood_src'); "
+        "conn_meta = hook.get_connection('sgfood_src'); "
+        "assert conn_meta.conn_type == 'postgres', f'conn_type esperado postgres pero fue {conn_meta.conn_type}'; "
+        "records = hook.get_records('SELECT 1;'); "
+        "assert records[0][0] == 1"
+    ]
+    res_hook_src = run_docker_compose(*cmd_hook_src, cwd=proyecto1_dir)
+    assert res_hook_src.returncode == 0, f"PostgresHook sgfood_src falló: {res_hook_src.stderr} {res_hook_src.stdout}"
 
 @pytest.mark.integracion
 def test_montajes_airflow(proyecto1_dir):
