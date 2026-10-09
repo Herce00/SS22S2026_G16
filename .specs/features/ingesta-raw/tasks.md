@@ -27,11 +27,11 @@ Toda la feature es zona verde del rol A. No requiere acuerdos previos con B.
 
 ## T1 — Esqueleto del paquete y arnés
 
-- [ ] Confirmar que la rama activa es `feat/ingesta-airflow`.
-- [ ] **Rojo:** `tests/ingesta/test_config.py` con una prueba que importa `sgfood_ingesta` y exige que exponga `listar_fuentes`, `cargar_fuente` y `cargar_todas`. Falla porque el paquete no existe.
-- [ ] **Verde:** crear `python/sgfood_ingesta/` con sus módulos vacíos y `errores.py` con la jerarquía de excepciones de [design.md](design.md).
-- [ ] Agregar `pythonpath = python` a `pytest.ini` y `psycopg[binary]` a `tests/requirements-dev.txt` con la versión de `airflow/requirements.txt`.
-- [ ] **Rojo (estática):** `airflow/requirements.txt` no incluye `pandas`. **Verde:** retirarlo y reconstruir la imagen.
+- [x] Confirmar que la rama activa es `feat/ingesta-airflow`.
+- [x] **Rojo:** `tests/ingesta/test_config.py` con una prueba que importa `sgfood_ingesta` y exige que exponga `listar_fuentes`, `cargar_fuente` y `cargar_todas`. Falla porque el paquete no existe.
+- [x] **Verde:** crear `python/sgfood_ingesta/` con sus módulos vacíos y `errores.py` con la jerarquía de excepciones de [design.md](design.md).
+- [x] Agregar `pythonpath = python` a `pytest.ini` y `psycopg[binary]` a `tests/requirements-dev.txt` con la versión de `airflow/requirements.txt`.
+- [x] **Rojo (estática):** `airflow/requirements.txt` no incluye `pandas`. **Verde:** retirarlo y reconstruir la imagen.
 
 **Verificación:** `pytest tests/ingesta -m "not integracion"`.
 **Commit:** `feat(p1-ingesta): add ingestion package skeleton`
