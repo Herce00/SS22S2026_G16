@@ -89,6 +89,29 @@ def test_ejecucion_tareas_carga_raw(proyecto1_dir):
                 f"Tarea {t_id} terminó con estado '{estados_por_tarea[t_id]}', se esperaba 'success'"
             )
 
+        # T5: Verificar que validar_carga_raw terminó en success y registró el conteo
+        assert "validar_carga_raw" in estados_por_tarea, "Tarea validar_carga_raw no encontrada"
+        assert estados_por_tarea["validar_carga_raw"] == "success", (
+            f"validar_carga_raw terminó con estado '{estados_por_tarea['validar_carga_raw']}', se esperaba 'success'"
+        )
+
+        # Buscar el archivo de log de validar_carga_raw para este run
+        logs_base = os.path.join(proyecto1_dir, "airflow", "logs", "dag_id=sgfood_elt")
+        log_encontrado = False
+        contenido_log = ""
+        for root, dirs, files in os.walk(logs_base):
+            if "task_id=validar_carga_raw" in root:
+                for file in files:
+                    if file.endswith(".log"):
+                        with open(os.path.join(root, file), "r", encoding="utf-8") as lf:
+                            contenido_log += lf.read()
+                        log_encontrado = True
+
+        assert log_encontrado, f"No se encontró archivo de log para validar_carga_raw en {logs_base}"
+        assert "8864" in contenido_log, f"El log de validar_carga_raw no contiene el total 8864:\n{contenido_log}"
+        assert "12" in contenido_log, f"El log de validar_carga_raw no contiene el conteo de 12 tablas:\n{contenido_log}"
+
+
         # 5. Verificar filas en raw (8864) y único _loaded_at
         script_dw = (
             "import psycopg\n"

@@ -87,9 +87,9 @@ Las rutas son relativas a `Proyecto1/` y los comandos se ejecutan desde esa carp
 
 ## T5 — Validación de la carga en el DAG
 
-- [ ] **Rojo (estructura):** `validar_carga_raw` existe, depende de todas las tareas de carga, no tiene reintentos y tiene tiempo límite.
-- [ ] **Rojo (ejecución):** en una ejecución completa, `validar_carga_raw` termina en `success` y su registro contiene el conteo por tabla y el total.
-- [ ] **Verde:** agregar la tarea al DAG.
+- [x] **Rojo (estructura):** `validar_carga_raw` existe, depende de todas las tareas de carga, no tiene reintentos y tiene tiempo límite.
+- [x] **Rojo (ejecución):** en una ejecución completa, `validar_carga_raw` termina en `success` y su registro contiene el conteo por tabla y el total.
+- [x] **Verde:** agregar la tarea al DAG.
 
 **Verificación:** `pytest tests/dag -k "estructura or ejecucion"`.
 **Commit:** `feat(p1-dag): validate raw load inside the dag`

@@ -5,6 +5,7 @@ from airflow.sdk import DAG, TaskGroup, task
 
 from sgfood_ingesta.config import listar_fuentes
 from sgfood_ingesta.ingesta import cargar_fuente
+from sgfood_ingesta.validacion import validar_conteos
 
 # Configuración y argumentos por defecto
 DEFAULT_ARGS = {
@@ -51,3 +52,16 @@ with DAG(
 
         for f in fuentes:
             crear_tarea_carga(f.tabla_raw)
+
+    # 2. Validación de la carga a raw (compara conteos fuente vs raw)
+    @task(
+        task_id="validar_carga_raw",
+        retries=0,
+        execution_timeout=timedelta(minutes=5),
+    )
+    def validar_carga_raw():
+        validar_conteos()
+
+    t_validar_carga_raw = validar_carga_raw()
+    carga_raw >> t_validar_carga_raw
+

@@ -77,6 +77,7 @@ def test_estructura_y_configuracion_dag(proyecto1_dir):
         "    dag.get_task(t).retries == 2 and dag.get_task(t).execution_timeout == timedelta(minutes=10)\n"
         "    for t in tareas_esperadas if t in dag.task_dict\n"
         ")\n"
+        "v_task = dag.get_task('validar_carga_raw') if 'validar_carga_raw' in dag.task_dict else None\n"
         "info = {\n"
         "    'dag_id': dag.dag_id,\n"
         "    'is_paused': dag.is_paused_upon_creation,\n"
@@ -87,6 +88,10 @@ def test_estructura_y_configuracion_dag(proyecto1_dir):
         "    'task_ids': list(dag.task_dict.keys()),\n"
         "    'tareas_esperadas': tareas_esperadas,\n"
         "    'tareas_reintentos_ok': tareas_reintentos_ok,\n"
+        "    'validar_carga_raw_existe': v_task is not None,\n"
+        "    'validar_carga_raw_retries': v_task.retries if v_task else None,\n"
+        "    'validar_carga_raw_timeout': int(v_task.execution_timeout.total_seconds()) if (v_task and v_task.execution_timeout) else None,\n"
+        "    'validar_carga_raw_upstreams': list(v_task.upstream_task_ids) if v_task else [],\n"
         "}\n"
         "print(json.dumps(info))\n"
     )
@@ -114,3 +119,11 @@ def test_estructura_y_configuracion_dag(proyecto1_dir):
     for t_id in tareas_esperadas:
         assert t_id in data["task_ids"], f"Tarea de carga '{t_id}' no encontrada en el DAG"
     assert data["tareas_reintentos_ok"] is True, "Las tareas de carga deben tener 2 reintentos y 10m de tiempo límite"
+
+    # T5: Verificar validar_carga_raw
+    assert data["validar_carga_raw_existe"] is True, "La tarea 'validar_carga_raw' debe existir en el DAG"
+    assert data["validar_carga_raw_retries"] == 0, "validar_carga_raw no debe tener reintentos"
+    assert data["validar_carga_raw_timeout"] == 300, "validar_carga_raw debe tener tiempo límite de 5 minutos (300s)"
+    for t_id in tareas_esperadas:
+        assert t_id in data["validar_carga_raw_upstreams"], f"validar_carga_raw debe depender de {t_id}"
+
