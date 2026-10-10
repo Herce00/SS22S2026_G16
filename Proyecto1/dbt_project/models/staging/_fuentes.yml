@@ -1,0 +1,138 @@
+version: 2
+
+sources:
+  - name: oltp
+    schema: raw
+    description: "Tablas transaccionales extraídas de oltp_sgfood hacia raw"
+    tables:
+      - name: sucursal
+        description: "Sucursales de SG-Food"
+        columns:
+          - name: id_sucursal
+          - name: nombre
+          - name: ciudad
+          - name: departamento
+          - name: _loaded_at
+
+      - name: categoria
+        description: "Categorías de productos"
+        columns:
+          - name: id_categoria
+          - name: nombre
+          - name: _loaded_at
+
+      - name: marca
+        description: "Marcas de productos"
+        columns:
+          - name: id_marca
+          - name: nombre
+          - name: _loaded_at
+
+      - name: producto
+        description: "Catálogo de productos"
+        columns:
+          - name: id_producto
+          - name: sku
+          - name: nombre
+          - name: id_categoria
+          - name: id_marca
+          - name: unidad_medida
+          - name: costo_base
+          - name: precio_lista
+          - name: activo
+          - name: _loaded_at
+
+      - name: cliente
+        description: "Clientes registrados"
+        columns:
+          - name: id_cliente
+          - name: nit
+          - name: nombre
+          - name: tipo_cliente
+          - name: municipio
+          - name: departamento
+          - name: fecha_alta
+          - name: _loaded_at
+
+      - name: venta
+        description: "Cabeceras de ventas"
+        columns:
+          - name: id_venta
+          - name: fecha
+          - name: id_cliente
+          - name: id_sucursal
+          - name: canal
+          - name: metodo_pago
+          - name: estado
+          - name: _loaded_at
+
+      - name: venta_detalle
+        description: "Líneas de detalle de ventas"
+        columns:
+          - name: id_detalle
+          - name: id_venta
+          - name: id_producto
+          - name: cantidad
+          - name: precio_unitario
+          - name: descuento
+          - name: subtotal
+          - name: _loaded_at
+
+  - name: archivos
+    schema: raw
+    description: "Tablas cargadas desde archivos CSV hacia raw"
+    tables:
+      - name: inventario_bodega
+        description: "Inventarios por bodega"
+        columns:
+          - name: fecha_corte
+          - name: id_sucursal
+          - name: id_producto
+          - name: stock_disponible
+          - name: stock_minimo
+          - name: stock_maximo
+          - name: lote
+          - name: fecha_vencimiento
+          - name: _loaded_at
+
+      - name: proveedores_precios
+        description: "Precios de proveedores"
+        columns:
+          - name: id_proveedor
+          - name: proveedor
+          - name: id_producto
+          - name: costo_proveedor
+          - name: plazo_dias
+          - name: fecha_vigencia
+          - name: _loaded_at
+
+      - name: devoluciones
+        description: "Devoluciones de productos"
+        columns:
+          - name: id_devolucion
+          - name: fecha
+          - name: id_venta
+          - name: id_producto
+          - name: cantidad
+          - name: motivo
+          - name: _loaded_at
+
+      - name: metas_ventas
+        description: "Metas de ventas mensuales"
+        columns:
+          - name: periodo
+          - name: id_sucursal
+          - name: meta_ventas
+          - name: meta_unidades
+          - name: _loaded_at
+
+      - name: promociones
+        description: "Promociones y campañas"
+        columns:
+          - name: id_promocion
+          - name: nombre
+          - name: fecha_inicio
+          - name: fecha_fin
+          - name: id_categoria
+          - name: porcentaje_descuento
+          - name: _loaded_at

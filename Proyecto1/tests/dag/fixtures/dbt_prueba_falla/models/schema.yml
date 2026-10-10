@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: test_sucursal
+    columns:
+      - name: id_sucursal
+        tests:
+          - not_null
+          - unique
+          - accepted_values:
+              values: [999999]

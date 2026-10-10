@@ -1,0 +1,10 @@
+version: 2
+
+models:
+  - name: test_sucursal
+    description: "Modelo de prueba sobre sucursal"
+    columns:
+      - name: id_sucursal
+        tests:
+          - not_null
+          - unique

@@ -1,0 +1,173 @@
+x-airflow-common: &airflow-common
+  image: sgfood-airflow:3.3.2
+  build: ./airflow
+  environment:
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__CORE__AUTH_MANAGER: airflow.providers.fab.auth_manager.fab_auth_manager.FabAuthManager
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__EXECUTION_API_SERVER_URL: http://airflow-apiserver:8080/execution/
+    AIRFLOW__API_AUTH__JWT_SECRET: ${AIRFLOW_JWT_SECRET:?AIRFLOW_JWT_SECRET is required}
+    AIRFLOW__API_AUTH__JWT_ISSUER: airflow
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg://${AIRFLOW_DB_USER:?AIRFLOW_DB_USER is required}:${AIRFLOW_DB_PASSWORD:?AIRFLOW_DB_PASSWORD is required}@airflow-db:5432/airflow
+    AIRFLOW_ADMIN_USER: ${AIRFLOW_ADMIN_USER:?AIRFLOW_ADMIN_USER is required}
+    AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?AIRFLOW_ADMIN_PASSWORD is required}
+    AIRFLOW_UID: ${AIRFLOW_UID:-50000}
+    DW_HOST: dw
+    DW_PORT: "5432"
+    DW_DB: ${DW_DB:?DW_DB is required}
+    DW_USER: ${DW_USER:?DW_USER is required}
+    DW_PASSWORD: ${DW_PASSWORD:?DW_PASSWORD is required}
+    SRC_HOST: src
+    SRC_PORT: "5432"
+    SRC_DB: ${SRC_DB:?SRC_DB is required}
+    SRC_USER: ${SRC_USER:?SRC_USER is required}
+    SRC_PASSWORD: ${SRC_PASSWORD:?SRC_PASSWORD is required}
+    AIRFLOW_CONN_SGFOOD_DW: postgres://${DW_USER}:${DW_PASSWORD}@dw:5432/${DW_DB}
+    AIRFLOW_CONN_SGFOOD_SRC: postgres://${SRC_USER}:${SRC_PASSWORD}@src:5432/${SRC_DB}
+    PYTHONPATH: /opt/airflow/python
+    DBT_PROJECT_DIR: /opt/airflow/dbt_project
+    DBT_PROFILES_DIR: /opt/airflow/dbt_project
+  volumes:
+    - ./airflow/dags:/opt/airflow/dags
+    - ./python:/opt/airflow/python
+    - ./dbt_project:/opt/airflow/dbt_project
+    - ./data:/opt/airflow/data
+    - ./airflow/logs:/opt/airflow/logs
+    - ./sql:/opt/airflow/sql:ro
+
+services:
+  dw:
+    image: postgres:16
+    container_name: sgfood_dw
+    environment:
+      POSTGRES_DB: ${DW_DB:?DW_DB is required}
+      POSTGRES_USER: ${DW_USER:?DW_USER is required}
+      POSTGRES_PASSWORD: ${DW_PASSWORD:?DW_PASSWORD is required}
+    ports:
+      - "${DW_PORT:-5433}:5432"
+    volumes:
+      - dw_data:/var/lib/postgresql/data
+      - ./sql/ddl:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  src:
+    image: postgres:16
+    container_name: sgfood_src
+    environment:
+      POSTGRES_DB: ${SRC_DB:?SRC_DB is required}
+      POSTGRES_USER: ${SRC_USER:?SRC_USER is required}
+      POSTGRES_PASSWORD: ${SRC_PASSWORD:?SRC_PASSWORD is required}
+    ports:
+      - "${SRC_PORT:-5434}:5432"
+    volumes:
+      - src_data:/var/lib/postgresql/data
+      - ./data/sgfood_oltp.sql:/docker-entrypoint-initdb.d/01_oltp.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB} && psql -h 127.0.0.1 -U $${POSTGRES_USER} -d $${POSTGRES_DB} -tAc 'SELECT 1 FROM oltp_sgfood.venta_detalle LIMIT 1' | grep -q 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  airflow-db:
+    image: postgres:16
+    container_name: sgfood_airflow_db
+    environment:
+      POSTGRES_DB: airflow
+      POSTGRES_USER: ${AIRFLOW_DB_USER:?AIRFLOW_DB_USER is required}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD:?AIRFLOW_DB_PASSWORD is required}
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  airflow-init:
+    <<: *airflow-common
+    container_name: sgfood_airflow_init
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate &&
+        airflow users create \
+          --username "$${AIRFLOW_ADMIN_USER}" \
+          --password "$${AIRFLOW_ADMIN_PASSWORD}" \
+          --firstname Admin \
+          --lastname User \
+          --role Admin \
+          --email admin@example.com
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+    restart: "no"
+
+  airflow-apiserver:
+    <<: *airflow-common
+    container_name: sgfood_airflow_apiserver
+    command: api-server
+    ports:
+      - "${AIRFLOW_PORT:-8080}:8080"
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  airflow-scheduler:
+    <<: *airflow-common
+    container_name: sgfood_airflow_scheduler
+    command: scheduler
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+      dw:
+        condition: service_healthy
+      src:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type SchedulerJob --hostname \"$${HOSTNAME}\""]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  airflow-dag-processor:
+    <<: *airflow-common
+    container_name: sgfood_airflow_dag_processor
+    command: dag-processor
+    depends_on:
+      airflow-db:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "airflow jobs check --job-type DagProcessorJob --hostname \"$${HOSTNAME}\""]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  dw_data:
+  src_data:
+  airflow_db_data:

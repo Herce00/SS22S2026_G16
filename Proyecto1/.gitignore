@@ -1,0 +1,20 @@
+# Environment variables and secrets
+.env
+
+# Execution logs
+logs/
+airflow/logs/
+
+# dbt generated folders
+target/
+dbt_packages/
+.user.yml
+
+# Python cache & artifacts
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.coverage
+htmlcov/

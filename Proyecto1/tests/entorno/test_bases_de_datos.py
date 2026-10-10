@@ -1,0 +1,66 @@
+import os
+import subprocess
+import yaml
+import pytest
+from conftest import run_docker_compose
+
+def test_bases_compose_declarations(proyecto1_dir):
+    """Verifica estáticamente la declaración de dw y src en docker-compose.yml."""
+    compose_path = os.path.join(proyecto1_dir, "docker-compose.yml")
+    assert os.path.exists(compose_path), "docker-compose.yml no existe"
+
+    with open(compose_path, "r", encoding="utf-8") as f:
+        compose = yaml.safe_load(f)
+
+    services = compose.get("services", {})
+    assert "dw" in services, "Servicio dw no declarado en docker-compose.yml"
+    assert "src" in services, "Servicio src no declarado en docker-compose.yml"
+
+    for s_name in ["dw", "src"]:
+        s = services[s_name]
+        image = s.get("image", "")
+        assert image, f"Servicio {s_name} debe tener una imagen definida"
+        assert not image.endswith(":latest") and image != "postgres", f"Servicio {s_name} no debe usar 'latest'"
+        assert image == "postgres:16", f"Servicio {s_name} debe usar postgres:16"
+        assert "healthcheck" in s, f"Servicio {s_name} debe tener healthcheck"
+        assert "volumes" in s, f"Servicio {s_name} debe tener volúmenes definidos"
+
+    # Verificar volúmenes nombrados
+    volumes = compose.get("volumes", {})
+    assert "dw_data" in volumes, "Volumen nombrado dw_data no definido"
+    assert "src_data" in volumes, "Volumen nombrado src_data no definido"
+
+def test_compose_fails_without_dw_password(proyecto1_dir, tmp_path):
+    """Verifica que docker compose config falle si falta DW_PASSWORD."""
+    env_example_path = os.path.join(proyecto1_dir, ".env.example")
+    with open(env_example_path, "r", encoding="utf-8") as f:
+        lines = [l for l in f if not l.startswith("DW_PASSWORD=")]
+    test_env = tmp_path / "without_dw_pass.env"
+    test_env.write_text("".join(lines), encoding="utf-8")
+    res = run_docker_compose("--env-file", str(test_env), "config", cwd=proyecto1_dir)
+    assert res.returncode != 0
+    assert "DW_PASSWORD" in (res.stderr + res.stdout)
+
+@pytest.mark.integracion
+def test_bases_healthy_and_responsive(proyecto1_dir, env_config):
+    """Verifica que dw y src estén healthy y respondan SELECT 1."""
+    dw_user = env_config.get("DW_USER", "dw_user")
+    dw_db = env_config.get("DW_DB", "sgfood_dw")
+    src_user = env_config.get("SRC_USER", "src_user")
+    src_db = env_config.get("SRC_DB", "sgfood_src")
+
+    # Verificar salud de dw
+    res_dw = run_docker_compose("exec", "-T", "dw", "pg_isready", cwd=proyecto1_dir)
+    assert res_dw.returncode == 0, f"dw pg_isready falló: {res_dw.stderr}"
+
+    # Consulta SELECT 1 en dw
+    res_sql_dw = run_docker_compose("exec", "-T", "dw", "psql", "-U", dw_user, "-d", dw_db, "-c", "SELECT 1;", cwd=proyecto1_dir)
+    assert res_sql_dw.returncode == 0 and "1" in res_sql_dw.stdout
+
+    # Verificar salud de src
+    res_src = run_docker_compose("exec", "-T", "src", "pg_isready", cwd=proyecto1_dir)
+    assert res_src.returncode == 0, f"src pg_isready falló: {res_src.stderr}"
+
+    # Consulta SELECT 1 en src
+    res_sql_src = run_docker_compose("exec", "-T", "src", "psql", "-U", src_user, "-d", src_db, "-c", "SELECT 1;", cwd=proyecto1_dir)
+    assert res_sql_src.returncode == 0 and "1" in res_sql_src.stdout

@@ -1,0 +1,16 @@
+        tabla        | filas 
+---------------------+-------
+ sucursal            |     6
+ categoria           |     8
+ marca               |    10
+ producto            |    80
+ cliente             |   250
+ venta               |  1200
+ venta_detalle       |  3209
+ inventario_bodega   |  3840
+ proveedores_precios |   103
+ devoluciones        |    80
+ metas_ventas        |    48
+ promociones         |    30
+ TOTAL               |  8864
+(13 rows)

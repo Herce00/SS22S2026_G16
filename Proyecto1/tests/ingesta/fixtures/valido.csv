@@ -1,0 +1,6 @@
+﻿id,codigo,monto,nota
+1,007,1.50,hola
+2,008,,
+3,009,2.00,   
+4,010,3.00,"campo, con coma"
+
