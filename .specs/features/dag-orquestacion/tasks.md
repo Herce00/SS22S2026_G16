@@ -147,20 +147,20 @@ Las rutas son relativas a `Proyecto1/` y los comandos se ejecutan desde esa carp
 
 Es la única tarea que escribe en `dbt_project/`, por la decisión D11. Se limita a lo que lista [design.md](design.md).
 
-- [ ] Confirmar contra la documentación de dbt 1.12 la forma del macro `generate_schema_name` y de `env_var`, y cerrar ese punto abierto.
-- [ ] **Rojo (estática):** `tests/dag/test_esqueleto_dbt.py`:
+- [x] Confirmar contra la documentación de dbt 1.12 la forma del macro `generate_schema_name` y de `env_var`, y cerrar ese punto abierto.
+- [x] **Rojo (estática):** `tests/dag/test_esqueleto_dbt.py`:
   - Existen `dbt_project.yml`, `profiles.yml`, el macro de schema, `_fuentes.yml` y el modelo de ejemplo.
   - `profiles.yml` no contiene contraseñas, hosts ni usuarios literales: todo sale de `env_var`.
   - Toda tabla de `raw` declarada como fuente en el proyecto dbt existe en `fuentes.yml`.
   - `models/` contiene un único archivo `.sql`, y ninguno en `intermediate/` ni `marts/`.
-- [ ] **Rojo (integración):** con `raw` cargado, dentro de `airflow-scheduler`:
+- [x] **Rojo (integración):** con `raw` cargado, dentro de `airflow-scheduler`:
   - `dbt debug`, `dbt run` y `dbt test` sobre `dbt_project` terminan con código 0.
   - El modelo de ejemplo existe en el schema `staging` con 6 filas y su clave convertida a entero.
   - No existe ningún schema cuyo nombre contenga dos veces `staging` o `marts`.
-- [ ] **Verde:** crear el esqueleto.
-- [ ] **Rojo y verde (independencia):** agregar un modelo temporal al proyecto, disparar `sgfood_elt` con los parámetros predeterminados y exigir que el modelo exista en el DW y que `git status` no muestre cambios en `airflow/`, `python/` ni `sql/`. Eliminar el modelo temporal y su objeto en el DW al terminar.
-- [ ] Disparar `sgfood_elt` con los parámetros predeterminados y guardar en `evidencia/` el estado de cada tarea y los registros de `dbt_run` y `dbt_test`.
-- [ ] Confirmar que las pruebas de `tests/dag/` de las tareas anteriores siguen pasando sin depender del esqueleto.
+- [x] **Verde:** crear el esqueleto.
+- [x] **Rojo y verde (independencia):** agregar un modelo temporal al proyecto, disparar `sgfood_elt` con los parámetros predeterminados y exigir que el modelo exista en el DW y que `git status` no muestre cambios en `airflow/`, `python/` ni `sql/`. Eliminar el modelo temporal y su objeto en el DW al terminar.
+- [x] Disparar `sgfood_elt` con los parámetros predeterminados y guardar en `evidencia/` el estado de cada tarea y los registros de `dbt_run` y `dbt_test`.
+- [x] Confirmar que las pruebas de `tests/dag/` de las tareas anteriores siguen pasando sin depender del esqueleto.
 
 **Verificación:** `pytest tests/dag` completo y ejecución del DAG en `success` con el proyecto real.
 **Commit:** `feat(p1-dbt): add dbt project skeleton and run full pipeline`

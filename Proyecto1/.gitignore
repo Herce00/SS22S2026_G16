@@ -8,6 +8,7 @@ airflow/logs/
 # dbt generated folders
 target/
 dbt_packages/
+.user.yml
 
 # Python cache & artifacts
 __pycache__/

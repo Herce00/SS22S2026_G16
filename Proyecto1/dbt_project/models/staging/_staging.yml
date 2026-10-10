@@ -1,0 +1,11 @@
+version: 2
+
+models:
+  - name: stg_oltp__sucursal
+    description: "Modelo de staging para sucursales de SG-Food (ejemplo para Rol B)"
+    columns:
+      - name: id_sucursal
+        description: "Identificador numérico de la sucursal convertido desde TEXT"
+        tests:
+          - unique
+          - not_null
