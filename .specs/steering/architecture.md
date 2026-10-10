@@ -199,7 +199,7 @@ El trabajo de los dos se toca solo en cuatro puntos. Fuera de ellos, cada uno ca
 | 3 | Datos en `raw` | Carga con Python de las 12 tablas (entregado) | `staging`, `intermediate` y `marts` sobre datos reales (pendiente) |
 | 4 | dbt en el DAG | Tareas `dbt deps`, `dbt run` y `dbt test` (entregado) | Modelos y pruebas del proyecto (pendiente) |
 | 5 | Validaciones | Tarea de conteos y tarea de validaciones SQL en el DAG (entregado) | Consultas de validación y analíticas (pendiente) |
-| 6 | Cierre | README de ingesta, DAG y evidencias (entregado; faltan capturas) | README de modelado, evidencias, `dbt docs` (pendiente) |
+| 6 | Cierre | README de ingesta, DAG y evidencias con capturas (entregado) | README de modelado, evidencias, `dbt docs` (pendiente) |
 
 ## Estado al 2026-10-10
 
@@ -219,7 +219,7 @@ El trabajo de los dos se toca solo en cuatro puntos. Fuera de ellos, cada uno ca
 **Del rol A**
 
 - [ ] Abrir el pull request de `feat/ingesta-airflow` hacia `main` y avisar a B. Sin ese merge, B no tiene de dónde partir.
-- [ ] Tomar las capturas de la interfaz de Airflow: grafo del DAG y ejecución exitosa.
+- [x] Tomar las capturas de la interfaz de Airflow: grafo del DAG, ejecución exitosa y fallo controlado.
 - [ ] Revisar el pull request de B cuando llegue.
 
 **Del rol B**

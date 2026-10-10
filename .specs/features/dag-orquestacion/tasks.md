@@ -188,7 +188,7 @@ Es la única tarea que escribe en `dbt_project/`, por la decisión D11. Se limit
 - [x] El pipeline corrió completo con el esqueleto del proyecto dbt real.
 - [x] Las pruebas del DAG pasan sin depender del contenido de `dbt_project/`.
 - [x] La guía para B se siguió paso a paso en un clon limpio.
-- [ ] Un integrante tomó las capturas del grafo y de la ejecución.
+- [x] Un integrante tomó las capturas del grafo y de la ejecución.
 
 ## Fuera de esta feature
 
