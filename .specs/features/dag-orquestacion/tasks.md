@@ -56,15 +56,15 @@ Las rutas son relativas a `Proyecto1/` y los comandos se ejecutan desde esa carp
 
 ## T3 — Validaciones SQL
 
-- [ ] **Rojo (unitaria):**
+- [x] **Rojo (unitaria):**
   - Carpeta inexistente o vacía: devuelve lista vacía y registra una advertencia.
   - Los archivos se ejecutan en orden alfabético y solo los de extensión `.sql`.
-- [ ] **Rojo (integración):** con las carpetas de `tests/dag/fixtures/`:
+- [x] **Rojo (integración):** con las carpetas de `tests/dag/fixtures/`:
   - `validaciones_ok`: termina bien y devuelve un resultado con cero filas.
   - `validaciones_falla`: lanza `ValidacionFallida` nombrando el archivo e incluyendo las filas devueltas.
   - Con dos archivos que fallan, el error nombra los dos.
   - Una consulta que intenta escribir es rechazada.
-- [ ] **Verde:** implementar `validar_sql`; crear las carpetas de prueba y `sql/validaciones/dag/.gitkeep`.
+- [x] **Verde:** implementar `validar_sql`; crear las carpetas de prueba y `sql/validaciones/dag/.gitkeep`.
 
 **Verificación:** `pytest tests/dag -k "validacion and sql"`.
 **Commit:** `feat(p1-dag): run sql validation files against the warehouse`

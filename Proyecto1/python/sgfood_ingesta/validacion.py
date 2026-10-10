@@ -118,3 +118,78 @@ def validar_conteos(conteos: Optional[list[ConteoTabla]] = None) -> list[ConteoT
         raise ValidacionFallida(msg)
 
     return conteos
+
+
+def validar_sql(carpeta: str) -> list[ResultadoValidacionSql]:
+    """Ejecuta en el DW cada archivo .sql de la carpeta, en orden alfabético, en modo de solo lectura.
+
+    Lanza ValidacionFallida si alguno devuelve filas o si una consulta intenta escribir.
+    Carpeta inexistente o vacía: registra una advertencia y retorna lista vacía.
+    """
+    if not os.path.isdir(carpeta):
+        logger.warning("La carpeta de validaciones SQL no existe: '%s'", carpeta)
+        return []
+
+    archivos = sorted([
+        f for f in os.listdir(carpeta)
+        if f.endswith(".sql") and os.path.isfile(os.path.join(carpeta, f))
+    ])
+
+    if not archivos:
+        logger.warning("No se encontraron archivos .sql en la carpeta de validaciones: '%s'", carpeta)
+        return []
+
+    conn = conectar_dw()
+    conn.read_only = True
+    resultados: list[ResultadoValidacionSql] = []
+    fallas: list[ResultadoValidacionSql] = []
+    errores_ejecucion: list[str] = []
+
+    try:
+        with conn.cursor() as cur:
+            for archivo in archivos:
+                ruta_archivo = os.path.join(carpeta, archivo)
+                with open(ruta_archivo, "r", encoding="utf-8") as f:
+                    query = f.read().strip()
+
+                try:
+                    cur.execute(query)
+                    filas = cur.fetchall()
+                    filas_devueltas = len(filas)
+                    muestra = tuple(tuple(r) for r in filas[:10])
+                    res = ResultadoValidacionSql(
+                        archivo=archivo,
+                        filas_devueltas=filas_devueltas,
+                        muestra=muestra,
+                    )
+                    resultados.append(res)
+                    if filas_devueltas > 0:
+                        fallas.append(res)
+                        logger.warning(
+                            "Validación SQL falló: archivo '%s' devolvió %d filas",
+                            archivo,
+                            filas_devueltas,
+                        )
+                except Exception as e:
+                    logger.error("Error al ejecutar validación SQL '%s': %s", archivo, e)
+                    errores_ejecucion.append(f"archivo '{archivo}' falló: {e}")
+                    conn.rollback()
+    finally:
+        conn.close()
+
+    if fallas or errores_ejecucion:
+        partes = []
+        if fallas:
+            detalles = [
+                f"archivo '{f.archivo}' devolvió {f.filas_devueltas} filas (muestra: {f.muestra})"
+                for f in fallas
+            ]
+            partes.append(f"incumplimientos en: {', '.join(detalles)}")
+        if errores_ejecucion:
+            partes.append(f"errores de ejecución: {', '.join(errores_ejecucion)}")
+        msg = f"Validación SQL fallida: {'; '.join(partes)}"
+        logger.error(msg)
+        raise ValidacionFallida(msg)
+
+    return resultados
+
