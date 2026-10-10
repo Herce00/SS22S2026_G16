@@ -181,8 +181,11 @@ Reglas:
 - Las tareas Python son envoltorios de una línea sobre `sgfood_ingesta`.
 - La lista de fuentes se obtiene con `listar_fuentes()` al analizar el archivo. Si `fuentes.yml` es inválido, el DAG debe fallar al importarse, con el error visible en Airflow.
 - Sin conexiones a bases de datos ni lectura de datos al analizar el archivo.
-- `loaded_at` se obtiene del contexto de la ejecución dentro de la tarea.
-- Las importaciones de Airflow siguen la API de la versión 3.3.2; se verifican contra su documentación antes de escribir.
+- `loaded_at` se obtiene del contexto de la ejecución dentro de la tarea (`context["dag_run"].start_date or context["logical_date"]`).
+- Las importaciones de Airflow siguen la API confirmada de la versión 3.3.2 (Task SDK):
+  - `from airflow.sdk import DAG, task, TaskGroup, Param, get_current_context`
+  - `from airflow.providers.standard.operators.bash import BashOperator`
+  - Parámetros del DAG: `dag_id="sgfood_elt"`, `schedule="@daily"`, `start_date=datetime(2026, 1, 1, tzinfo=timezone.utc)`, `catchup=False`, `max_active_runs=1`, `max_active_tasks=4`, `is_paused_upon_creation=True`, `tags=["sgfood", "elt"]`, `default_args=...`.
 
 ## Cambios al entorno
 
@@ -317,6 +320,6 @@ Proyecto1/
 
 - [x] Puntos de "Dependencias con el rol B": definidos por A el 2026-10-10 (decisiones D9, D10 y D11).
 - [ ] Confirmar contra la documentación de dbt 1.12 la forma del macro `generate_schema_name` y de `env_var` en `profiles.yml`.
-- [ ] Confirmar contra la documentación de Airflow 3.3.2 las importaciones del DAG, del operador de Bash y la forma de leer el inicio de la ejecución desde el contexto.
-- [ ] Confirmar cómo se crea un DAG en pausa en Airflow 3.3.2.
+- [x] Confirmar contra la documentación de Airflow 3.3.2 las importaciones del DAG, del operador de Bash y la forma de leer el inicio de la ejecución desde el contexto (Fuente: Airflow 3.3.2 Task SDK: `airflow.sdk.DAG`, `airflow.sdk.task`, `airflow.providers.standard.operators.bash.BashOperator`, context `dag_run.start_date` o `logical_date`).
+- [x] Confirmar cómo se crea un DAG en pausa en Airflow 3.3.2 (Fuente: `DAG(is_paused_upon_creation=True)` en `airflow.sdk.DAG`).
 - [x] Proyecto dbt para la integración: se usa el esqueleto que arma esta feature.

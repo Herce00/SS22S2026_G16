@@ -35,8 +35,8 @@ Las rutas son relativas a `Proyecto1/` y los comandos se ejecutan desde esa carp
 
 ## T1 — Verificar la API de Airflow 3.3.2
 
-- [ ] Confirmar contra la documentación oficial de la versión 3.3.2: importación del DAG y de las tareas Python, importación del operador de Bash, parámetros de programación y de pausa al crearse, y cómo leer el inicio de la ejecución desde el contexto de una tarea.
-- [ ] Anotar en [design.md](design.md) las importaciones y los nombres de parámetros confirmados.
+- [x] Confirmar contra la documentación oficial de la versión 3.3.2: importación del DAG y de las tareas Python, importación del operador de Bash, parámetros de programación y de pausa al crearse, y cómo leer el inicio de la ejecución desde el contexto de una tarea.
+- [x] Anotar en [design.md](design.md) las importaciones y los nombres de parámetros confirmados.
 
 **Verificación:** los puntos abiertos de [design.md](design.md) sobre Airflow quedan marcados, cada uno con su fuente.
 **Commit:** `docs(p1-dag): confirm airflow 3.3.2 api for the dag`
