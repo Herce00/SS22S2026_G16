@@ -1,0 +1,10 @@
+name: 'sgfood_test_falla'
+version: '1.0.0'
+config-version: 2
+profile: 'sgfood_test_profile'
+model-paths: ["models"]
+macro-paths: ["macros"]
+models:
+  sgfood_test_falla:
+    +schema: dag_test
+    +materialized: view

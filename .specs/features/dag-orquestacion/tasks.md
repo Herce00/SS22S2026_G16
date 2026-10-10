@@ -121,13 +121,13 @@ Las rutas son relativas a `Proyecto1/` y los comandos se ejecutan desde esa carp
 
 ## T8 — Fallos y concurrencia
 
-- [ ] **Rojo (ejecución):** `tests/dag/test_fallos_dag.py`:
+- [x] **Rojo (ejecución):** `tests/dag/test_fallos_dag.py`:
   - Con `dbt_modelo_roto`: `dbt_run` termina en `failed`; `dbt_test` y `validar_marts` quedan sin ejecutar; la ejecución termina en `failed`; `raw` conserva 8864 filas.
   - Con `dbt_prueba_falla`: `dbt_run` en `success`, `dbt_test` en `failed`, `validar_marts` sin ejecutar.
   - Con `validaciones_falla`: `validar_marts` en `failed` y su registro nombra el archivo.
   - Con dos ejecuciones disparadas seguidas: la segunda no inicia tareas hasta que la primera termina.
-- [ ] **Verde:** corregir lo que las pruebas revelen. Si todo pasa sin cambios, registrarlo.
-- [ ] Cada prueba comprueba el estado de cada tarea por separado y limpia sus ejecuciones.
+- [x] **Verde:** corregir lo que las pruebas revelen. Si todo pasa sin cambios, registrarlo.
+- [x] Cada prueba comprueba el estado de cada tarea por separado y limpia sus ejecuciones.
 
 **Verificación:** `pytest tests/dag -k "fallos"`.
 **Commit:** `test(p1-dag): verify failure propagation and single active run`
