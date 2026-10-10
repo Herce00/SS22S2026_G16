@@ -167,27 +167,27 @@ Es la única tarea que escribe en `dbt_project/`, por la decisión D11. Se limit
 
 ## T11 — Guía para B y documentación
 
-- [ ] Escribir `docs/guia_rol_b.md` con la estructura de [design.md](design.md).
-- [ ] Ejecutar cada comando de la guía en un clon limpio y corregir lo que no funcione.
-- [ ] Escribir `dbt_project/README.md`: qué es configuración, qué es ejemplo y qué decisiones quedan abiertas.
-- [ ] Agregar al `README.md` la sección del DAG: grafo, tabla de tareas, reintentos y tiempos límite, parámetros de ejecución, cómo activarlo y dispararlo, y cómo leer una ejecución fallida.
-- [ ] Documentar la convención de validaciones finales.
-- [ ] Marcar los puntos de integración 4 y 5 en [architecture.md](../../steering/architecture.md) según lo entregado.
-- [ ] Listar las capturas de pantalla que debe tomar un integrante: grafo del DAG y ejecución exitosa.
-- [ ] Marcar en este documento solo lo observado.
+- [x] Escribir `docs/guia_rol_b.md` con la estructura de [design.md](design.md).
+- [x] Ejecutar cada comando de la guía en un clon limpio y corregir lo que no funcione.
+- [x] Escribir `dbt_project/README.md`: qué es configuración, qué es ejemplo y qué decisiones quedan abiertas.
+- [x] Agregar al `README.md` la sección del DAG: grafo, tabla de tareas, reintentos y tiempos límite, parámetros de ejecución, cómo activarlo y dispararlo, y cómo leer una ejecución fallida.
+- [x] Documentar la convención de validaciones finales.
+- [x] Marcar los puntos de integración 4 y 5 en [architecture.md](../../steering/architecture.md) según lo entregado.
+- [x] Listar las capturas de pantalla que debe tomar un integrante: grafo del DAG y ejecución exitosa.
+- [x] Marcar en este documento solo lo observado.
 
 **Verificación:** siguiendo solo la guía, se llega desde un clon limpio a `raw` cargado, dbt ejecutado y el DAG en una ejecución exitosa.
 **Commit:** `docs(p1-dag): document pipeline orchestration and role B guide`
 
 ## Definición de terminado
 
-- [ ] Todos los escenarios Gherkin de [requirements.md](requirements.md) pasan.
-- [ ] `pytest tests/entorno tests/contrato tests/ingesta tests/dag` pasa completo en un entorno limpio.
-- [ ] El archivo del DAG no contiene lógica de carga, SQL ni nombres de tablas.
-- [ ] La evidencia de una ejecución completa está versionada.
-- [ ] El pipeline corrió completo con el esqueleto del proyecto dbt real.
-- [ ] Las pruebas del DAG pasan sin depender del contenido de `dbt_project/`.
-- [ ] La guía para B se siguió paso a paso en un clon limpio.
+- [x] Todos los escenarios Gherkin de [requirements.md](requirements.md) pasan.
+- [x] `pytest tests/entorno tests/contrato tests/ingesta tests/dag` pasa completo en un entorno limpio.
+- [x] El archivo del DAG no contiene lógica de carga, SQL ni nombres de tablas.
+- [x] La evidencia de una ejecución completa está versionada.
+- [x] El pipeline corrió completo con el esqueleto del proyecto dbt real.
+- [x] Las pruebas del DAG pasan sin depender del contenido de `dbt_project/`.
+- [x] La guía para B se siguió paso a paso en un clon limpio.
 - [ ] Un integrante tomó las capturas del grafo y de la ejecución.
 
 ## Fuera de esta feature

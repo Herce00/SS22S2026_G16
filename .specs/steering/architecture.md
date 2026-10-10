@@ -196,11 +196,11 @@ El trabajo de los dos se toca solo en cuatro puntos. Fuera de ellos, cada uno ca
 | 1 | Entorno | `docker compose up` funcional con los tres schemas creados (entregado) | Proyecto dbt que se conecta al DW |
 | 2 | Contrato raw `v1` | Tablas y columnas de `raw`, DDL y BD fuente poblada (entregado) | Validación; `sources.yml` |
 | 3 | Datos en `raw` | Carga con Python de las 12 tablas (entregado) | `staging` y `marts` sobre datos reales |
-| 4 | dbt en el DAG | Tareas `dbt run` y `dbt test` | Proyecto ejecutable y comandos definidos |
-| 5 | Validaciones | Tarea de conteos en el DAG | Consultas de validación y analíticas |
-| 6 | Cierre | README de ingesta y evidencias | README de modelado, evidencias, `dbt docs` |
+| 4 | dbt en el DAG | Tareas `dbt run` y `dbt test` (entregado) | Proyecto ejecutable y comandos definidos |
+| 5 | Validaciones | Tarea de conteos en el DAG y validaciones SQL (entregado) | Consultas de validación y analíticas |
+| 6 | Cierre | README de ingesta y evidencias (entregado) | README de modelado, evidencias, `dbt docs` |
 
-Features previstas del rol A, en orden: `entorno-base` (terminada), `contrato-raw` (terminada), `ingesta-raw` (terminada), `dag-orquestacion`.
+Features previstas del rol A, en orden: `entorno-base` (terminada), `contrato-raw` (terminada), `ingesta-raw` (terminada), `dag-orquestacion` (terminada).
 
 ## Pendientes
 

@@ -185,33 +185,133 @@ docker compose run --rm airflow-scheduler python -m sgfood_ingesta
 | `1` | Fallo en carga | Error durante la extracción, discrepancia de conteo o archivo inexistente. La tabla afectada se revierte. |
 | `2` | Configuración / argumentos inválidos | Argumentos erróneos o tabla inexistente en `fuentes.yml`. |
 
-### 8. Ejecución de pruebas automatizadas
+### 8. Orquestación del Pipeline ELT (DAG sgfood_elt)
 
-El proyecto cuenta con un arnés de pruebas automatizadas en `tests/entorno/`, `tests/contrato/` y `tests/ingesta/` utilizando `pytest`.
+El DAG `sgfood_elt` (`airflow/dags/sgfood_elt.py`) automatiza el ciclo completo del pipeline ELT:
 
-Para ejecutarlas desde el host:
+```mermaid
+graph LR
+    subgraph Ingesta Concurrente
+        C1[cargar_categoria]
+        C2[cargar_cliente]
+        C3[...]
+        C12[cargar_venta_detalle]
+    end
+    C1 --> V1[validar_carga_raw]
+    C2 --> V1
+    C3 --> V1
+    C12 --> V1
+    V1 --> D1[dbt_deps]
+    D1 --> D2[dbt_run]
+    D2 --> D3[dbt_test]
+    D3 --> V2[validar_marts]
+```
+
+- **Programación:** Diaria (`@daily`), en pausa al crearse (`is_paused_upon_creation=True`), `catchup=False`.
+- **Concurrencia:** `max_active_runs=1` (evita colisiones de carga simultánea) y `max_active_tasks=4`.
+
+#### Tabla de tareas, reintentos y tiempos límite
+
+| Tarea / Grupo | Tipo | Reintentos | Retardo reintento | Tiempo límite | Propósito |
+|---|---|:---:|:---:|:---:|---|
+| `carga_raw.cargar_<tabla>` (x12) | `@task` (Python) | 2 | 1 min | 10 min | Ingesta de cada fuente a `raw` con `_loaded_at` compartido. |
+| `validar_carga_raw` | `@task` (Python) | 0 | - | 5 min | Verifica que conteo fuente == conteo raw para las 12 tablas. Falla de inmediato ante discrepancias. |
+| `dbt_deps` | `BashOperator` | 2 | 1 min | 10 min | Descarga paquetes dbt si existe `packages.yml`. |
+| `dbt_run` | `BashOperator` | 1 | 1 min | 20 min | Compila y ejecuta modelos de staging, intermediate y marts. |
+| `dbt_test` | `BashOperator` | 0 | - | 20 min | Ejecuta pruebas de calidad dbt (unicidad, no-nulos, relaciones). |
+| `validar_marts` | `@task` (Python) | 0 | - | 10 min | Ejecuta archivos SQL de validación de negocio en orden alfabético. Falla si alguna consulta devuelve filas. |
+
+#### Parámetros configurables (`params`)
+
+El DAG admite parámetros en tiempo de ejecución o disparo manual:
+- `dbt_project_dir`: Ruta del proyecto dbt (por defecto `/opt/airflow/dbt_project`).
+- `dbt_profiles_dir`: Ruta del perfil dbt (por defecto `/opt/airflow/dbt_project`).
+- `validaciones_dir`: Carpeta de consultas SQL de validación de marts (por defecto `/opt/airflow/sql/validaciones/dag`).
+
+#### Cómo activarlo y dispararlo
+
+```bash
+# Activar (despausar) el DAG
+docker compose exec airflow-scheduler airflow dags unpause -y sgfood_elt
+
+# Disparar ejecución con parámetros predeterminados
+docker compose exec airflow-scheduler airflow dags trigger sgfood_elt
+
+# Disparar con parámetros personalizados (JSON)
+docker compose exec airflow-scheduler airflow dags trigger sgfood_elt --conf '{"dbt_project_dir": "/opt/airflow/dbt_project"}'
+```
+
+#### Cómo leer e investigar una ejecución fallida
+
+1. **Desde la interfaz web de Airflow (UI):**
+   - Acceda a `http://localhost:8080` con usuario y contraseña de `.env` (`AIRFLOW_ADMIN_USER` / `AIRFLOW_ADMIN_PASSWORD`).
+   - Ingrese al DAG `sgfood_elt` y seleccione la vista **Grid** o **Graph**.
+   - Identifique la tarea en estado rojo (`failed`). Haga clic en ella y presione **Logs** para ver el stack trace completo.
+2. **Desde la línea de comandos (CLI):**
+   ```bash
+   # Listar últimas ejecuciones del DAG
+   docker compose exec airflow-scheduler airflow dags list-runs -d sgfood_elt --limit 5
+
+   # Consultar el log de una tarea fallida específica
+   docker compose exec airflow-scheduler airflow tasks logs sgfood_elt <task_id> <dag_run_id>
+   ```
+3. **Causas típicas de fallo:**
+   - En `carga_raw.*`: Base fuente inaccesible o CSV faltante.
+   - En `validar_carga_raw`: Discrepancia en conteos entre origen y destino.
+   - En `dbt_run`: Error de sintaxis SQL o tabla de origen faltante.
+   - En `dbt_test`: Registros duplicados o valores nulos que violan las reglas dbt.
+   - En `validar_marts`: Una consulta en `sql/validaciones/dag/` arrojó filas (inconsistencia de negocio).
+
+#### Convención de validaciones finales (`sql/validaciones/dag/`)
+
+- Las consultas deben guardarse en `Proyecto1/sql/validaciones/dag/`.
+- Formato: archivos `.sql` con prefijo numérico indicando orden de ejecución (ej. `01_integridad.sql`, `02_totales.sql`).
+- Semántica: **Toda consulta debe devolver 0 filas si el Data Warehouse es consistente**. Si devuelve una o más filas, la tarea `validar_marts` falla inmediatamente y registra las filas anómalas en el log.
+
+#### Capturas de pantalla requeridas para la entrega / reporte
+
+Para la entrega del proyecto, el integrante debe tomar las siguientes capturas desde la UI de Airflow (`http://localhost:8080`):
+1. **Grafo completo del DAG (`Graph View`):** Mostrando la estructura completa desde `carga_raw` hasta `validar_marts`.
+2. **Ejecución exitosa (`Grid View` o `Graph View` en verde):** Mostrando todas las tareas en estado `success` (verde oscuro) para una corrida completa del pipeline.
+
+
+### 9. Proyecto de Transformación dbt (dbt_project)
+
+El esqueleto inicial en `Proyecto1/dbt_project/` permite que el **Rol B** construya modelos de staging, intermediate y marts conectando directamente al DW vía PostgreSQL adapter:
+
+- **Configuración central:** `dbt_project.yml` define materializaciones por carpeta (staging como vista, marts como tabla).
+- **Conexión:** `profiles.yml` lee variables `DW_*` mediante `env_var`.
+- **Macro de Schemas:** `macros/generate_schema_name.sql` garantiza que dbt escriba exactamente en los schemas `staging` y `marts`.
+- **Fuentes:** `models/staging/_fuentes.yml` declara las 12 tablas de `raw`.
+- **Ejemplo de Staging:** `models/staging/stg_oltp__sucursal.sql` demuestra el consumo con `source()`, casteo desde `TEXT` y pruebas en `_staging.yml`.
+
+> Consulte la [Guía de Arranque para Rol B](docs/guia_rol_b.md) para detalles completos de ejecución local, desarrollo de nuevos modelos y convenciones.
+
+### 10. Ejecución de pruebas automatizadas
+
+El proyecto cuenta con un arnés completo de pruebas automatizadas en `tests/entorno/`, `tests/contrato/`, `tests/ingesta/` y `tests/dag/` utilizando `pytest`:
 
 1. Instale las dependencias de prueba:
    ```bash
    pip install -r tests/requirements-dev.txt
    ```
 
-2. Ejecute las pruebas estáticas de contrato, configuración e ingesta:
+2. Pruebas unitarias y de configuración (rápidas, sin Docker):
    ```bash
-   pytest tests/contrato tests/entorno tests/ingesta -m "not integracion and not lenta"
+   pytest tests/ -m "not integracion and not lenta"
    ```
 
-3. Ejecute la suite completa de integración (entorno, contrato e ingesta):
+3. Suite completa de integración (con contenedores activos):
    ```bash
-   pytest tests/entorno tests/contrato tests/ingesta
+   pytest tests/entorno tests/contrato tests/ingesta tests/dag
    ```
 
-4. Para ejecutar de manera explícita la prueba de reinicio limpio (`down -v` y ciclo de reinicio de contenedores):
+4. Prueba lenta de ciclo limpio de reinicio (`down -v` / `up -d`):
    ```bash
    pytest tests/entorno/test_reinicio.py -m lenta
    ```
 
-### 9. Reinicio a estado limpio
+### 11. Reinicio a estado limpio
 
 Para restablecer el entorno borrando volúmenes y datos persistidos:
 
@@ -223,7 +323,7 @@ docker compose up -d
 > [!IMPORTANT]
 > **Comportamiento de inicialización de volúmenes:** Los scripts ubicados en `/docker-entrypoint-initdb.d/` tanto en `dw` (`01_schemas.sql`, `02_raw_tables.sql`) como en `src` (`01_oltp.sql`) se ejecutan **únicamente cuando sus volúmenes nombrados (`dw_data` y `src_data`) están completamente vacíos**. Si se agregan o modifican scripts DDL con un entorno ya levantado, es obligatorio ejecutar `docker compose down -v` para recrear las bases de datos desde cero, o bien aplicar los scripts manualmente con `psql`.
 
-### 10. Problemas frecuentes y resolución
+### 12. Problemas frecuentes y resolución
 
 - **Puerto del host ocupado (Bind failed / port is already allocated):**
   Si puertos como 5433, 5434 u 8080 están ocupados por otros servicios locales en el host, cambie los valores correspondientes en su archivo `.env` local (por ejemplo `DW_PORT=5443`, `SRC_PORT=5444`, `AIRFLOW_PORT=8089`). No modifique `docker-compose.yml`.
@@ -231,3 +331,4 @@ docker compose up -d
   Los scripts de `/docker-entrypoint-initdb.d/` solo se ejecutan cuando el volumen de base de datos está vacío. Si se crearon antes de montar el script, ejecute un reinicio limpio con `docker compose down -v` y vuelva a iniciar.
 - **Variable requerida faltante:**
   Si falta alguna variable obligatoria en `.env`, `docker compose config` o `docker compose up` fallará indicando el nombre exacto de la variable que debe definirse.
+
