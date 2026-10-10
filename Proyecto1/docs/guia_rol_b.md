@@ -35,11 +35,14 @@ El Rol A ha completado la infraestructura de ingesta y orquestación técnica de
 
 ## 2. Arranque en 5 pasos
 
-### Paso 1: Clonar y verificar rama
-Asegúrate de trabajar sobre tu rama de feature (por ejemplo, `feat/modelado-dbt`):
+### Paso 1: Crear tu rama desde `main`
+El trabajo del Rol A llega a `main` por pull request. Crea tu rama **después** de ese merge; si la creas antes, no tendrás el entorno, los datos ni el esqueleto.
 ```bash
-git checkout -b feat/modelado-dbt
+git checkout main
+git pull
+git checkout -b feat/dbt-modelado
 ```
+El nombre `feat/dbt-modelado` es el acordado en el steering. Cada integrante trabaja solo en su rama y los cambios entran a `main` por pull request revisado por el otro.
 
 ### Paso 2: Configurar variables de entorno
 Copia la plantilla `.env.example` a `.env` en la raíz de `Proyecto1/`:
@@ -61,7 +64,7 @@ docker compose ps
 ### Paso 4: Ejecutar el pipeline de ingesta inicial
 Puedes disparar la carga completa a `raw` desde la línea de comandos o desde Airflow:
 ```bash
-docker compose exec airflow-scheduler python -m sgfood_ingesta.cli
+docker compose exec airflow-scheduler python -m sgfood_ingesta
 ```
 O disparando el DAG en Airflow:
 ```bash
@@ -126,13 +129,15 @@ El Rol B tiene autonomía total dentro de `Proyecto1/dbt_project/`:
 1. **Crear modelos de Staging:**
    - Agrega archivos `.sql` dentro de `Proyecto1/dbt_project/models/staging/`.
    - Consume las fuentes de `raw` usando la macro `{{ source('oltp', 'tabla') }}` o `{{ source('archivos', 'tabla') }}` declaradas en `_fuentes.yml`.
-   - Realiza el casteo de tipos desde `TEXT` (ej. `id_producto::int`, `fecha::date`, `monto::numeric(12,2)`).
+   - Convierte los tipos desde `TEXT`. Hazlo de forma tolerante: un `::int` directo detiene el modelo ante un solo valor inválido. El modelo de ejemplo muestra el patrón: `CASE WHEN id_producto ~ '^[0-9]+$' THEN id_producto::int END`, y una prueba `not_null` reporta lo que no se pudo convertir.
+   - El tipo esperado de cada columna está en `Proyecto1/docs/contrato_raw.md`.
 2. **Crear modelos de Intermediate y Marts:**
    - Agrega modelos intermedios en `Proyecto1/dbt_project/models/intermediate/`.
    - Agrega dimensiones y tablas de hechos en `Proyecto1/dbt_project/models/marts/`.
    - Usa `{{ ref('nombre_modelo') }}` para referenciar modelos previos.
 3. **Schemas automáticos:**
    - Gracias a la macro `macros/generate_schema_name.sql`, dbt escribe directamente en los schemas `staging` y `marts` del Data Warehouse sin prefijos redundantes.
+   - **`intermediate` no tiene schema asignado.** Tal como está, un modelo en esa carpeta se crea en `public`. Dónde vive esa capa es decisión tuya: agrega `+schema: staging`, u otro nombre, bajo `intermediate` en `dbt_project.yml`.
 4. **Integración automática en el pipeline:**
    - Cada vez que el DAG `sgfood_elt` se ejecute, correrá automáticamente `dbt run` y `dbt test` sobre todos tus modelos agregados. No necesitas modificar ningún archivo de Airflow, Python ni Docker.
 
@@ -169,5 +174,55 @@ Además de las pruebas de dbt (`dbt test`), el DAG cuenta con una tarea final (`
 | `Proyecto1/python/` | Rol A | Código de ingesta y conexiones. Rol B lo consume como servicio. |
 | `Proyecto1/airflow/` | Rol A | Definición de DAGs y orquestación. Parámetros dinámicos vía `params`. |
 | `Proyecto1/dbt_project/` | **Rol B** | Propiedad exclusiva de B tras la entrega del esqueleto. |
-| `Proyecto1/sql/ddl/` | Compartido | DDL inicial de bases de datos. No alterar schemas base (`raw`, `staging`, `marts`). |
-| `Proyecto1/sql/validaciones/dag/` | **Rol B** | Consultas finales de calidad de datos escritas por B. |
+| `Proyecto1/sql/ddl/` | Rol A | DDL de schemas y tablas de `raw`. Las tablas de `staging` y `marts` las crea dbt, no este DDL. |
+| `Proyecto1/sql/validaciones/` | **Rol B** | Consultas analíticas y de validación. La subcarpeta `dag/` es la que ejecuta el DAG. |
+| `Proyecto1/docs/contrato_raw.md` | Compartido | Interfaz entre los dos roles. Se cambia solo con acuerdo. |
+| `Proyecto1/tests/` | Rol A | Pruebas de entorno, contrato, ingesta y DAG. No dependen del contenido de `dbt_project/`. |
+
+### Qué puedes cambiar sin avisar
+
+Modelos, capas, nombres de modelos, materializaciones, diseño dimensional, pruebas dbt, macros, paquetes, documentación, el schema de `intermediate`, los archivos de `sql/validaciones/` y el uso de los casos de calidad opcionales. Nada de eso afecta al Rol A: el DAG ejecuta el proyecto completo sin conocer su contenido.
+
+### Qué necesita acuerdo con el Rol A
+
+- Cambiar tablas o columnas de `raw`, o pedir columnas de auditoría nuevas.
+- Renombrar los schemas `raw`, `staging` o `marts`, o las variables `DW_*`.
+- Necesitar argumentos distintos de dbt en el DAG: selectores, variables u objetivos.
+- Mover `profiles.yml` o el proyecto dbt a otra ruta.
+- Cambiar la convención de las validaciones finales.
+- Agregar dependencias Python o cambiar versiones fijadas.
+
+El detalle está en la sección "Interfaz entre A y B" de `.specs/steering/architecture.md`.
+
+---
+
+## 7. Qué te queda por hacer
+
+Lo que sigue es el alcance del Rol B según el enunciado y la rúbrica. El esqueleto solo resuelve la parte mecánica.
+
+### Obligatorio
+
+- [ ] **Diseñar el modelo dimensional.** Definir hechos, dimensiones y granularidad. Los datos dan para, al menos, ventas (al nivel de línea de detalle) e inventario (foto mensual), con dimensiones como producto, marca, categoría, cliente, sucursal y tiempo. Devoluciones, metas, promociones y precios de proveedores pueden ser hechos o dimensiones adicionales.
+- [ ] **Modelos `staging`** para las 11 tablas restantes de `raw`: renombrar, convertir tipos y limpiar. Sin joins.
+- [ ] **Modelos `intermediate`** con los joins y la lógica reutilizable, y decidir en qué schema viven.
+- [ ] **Modelos `marts`**: dimensiones y hechos, con sus claves y relaciones.
+- [ ] **Materializaciones** coherentes por capa, con al menos una `incremental` donde tenga sentido.
+- [ ] **Pruebas dbt**: `unique` y `not_null` en cada clave, `relationships` de hechos a dimensiones, `accepted_values` en columnas categóricas y al menos una prueba personalizada.
+- [ ] **Documentación dbt**: descripciones en YAML y `dbt docs generate` sin errores.
+- [ ] **Consultas analíticas y de validación** en `sql/validaciones/`: conteos, integridad referencial y resultados de negocio. Las que deban detener el pipeline van en `sql/validaciones/dag/`.
+- [ ] **Secciones del README** que hoy están marcadas como pendientes: modelo del Data Warehouse, estructura del proyecto dbt y justificación de diseño.
+- [ ] **Evidencia** de tu parte en `Proyecto1/evidencia/`: resultado de `dbt run`, `dbt test` y de las consultas analíticas.
+
+### Decisiones abiertas que son tuyas
+
+- [ ] En qué schema se materializa `intermediate`.
+- [ ] Si se usan los casos de `casos_calidad_opcionales.csv` y cómo. No se cargan en la corrida principal (decisión D8).
+- [ ] Conservar, modificar o eliminar el modelo de ejemplo `stg_oltp__sucursal`.
+
+### Opcional
+
+- [ ] Conectar los `marts` a Power BI, Metabase o Superset.
+
+### Cómo saber que terminaste
+
+Dispara `sgfood_elt` desde Airflow. Si las 17 tareas terminan en verde con tus modelos, tus pruebas y tus validaciones, el pipeline completo está integrado. No hace falta que el Rol A cambie nada.

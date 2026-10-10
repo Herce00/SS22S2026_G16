@@ -2,6 +2,45 @@
 
 Pipeline de Extracción, Carga y Transformación (ELT) para SG-Food utilizando Python, Apache Airflow, dbt Core y PostgreSQL como Data Warehouse.
 
+- **Curso:** Seminario de Sistemas 2 — USAC, Facultad de Ingeniería
+- **Grupo:** 16
+
+## Integrantes
+
+| Integrante | Carnet | Rol |
+|------------|--------|-----|
+| Keneth Willard Lopez Ovalle | `202100106` | A — Ingesta y orquestación: infraestructura, Python, Airflow |
+| César Rolando Hernández Palacios | `202000806` | B — Transformación y modelado: dbt, modelo dimensional, validaciones |
+
+## Descripción del pipeline
+
+```
+BD transaccional (oltp_sgfood) ──┐
+                                 ├─► Python (sgfood_ingesta) ─► raw ─► dbt staging ─► dbt intermediate ─► dbt marts
+5 archivos CSV ──────────────────┘
+                 Airflow (sgfood_elt): carga → validación de carga → dbt run → dbt test → validaciones finales
+```
+
+1. **Extracción y carga:** Python lee las 7 tablas de la base transaccional y los 5 archivos CSV, y las carga tal cual, como texto, en el schema `raw`.
+2. **Transformación:** dbt convierte tipos y construye el modelo dimensional en `staging` y `marts`.
+3. **Orquestación:** un DAG de Airflow ejecuta todo en orden, con reintentos, validaciones y control de errores.
+
+## Estado del proyecto
+
+| Componente | Estado | Dónde está documentado |
+|------------|--------|------------------------|
+| Entorno con Docker Compose | Terminado | [Manual de implementación](#manual-de-implementación), secciones 1 a 5 |
+| Datos oficiales y contrato de `raw` | Terminado | Sección 6 y [docs/contrato_raw.md](docs/contrato_raw.md) |
+| Extracción y carga con Python | Terminado | Sección 7 |
+| DAG de Airflow | Terminado | Sección 8 |
+| Esqueleto del proyecto dbt | Terminado | Sección 9 y [dbt_project/README.md](dbt_project/README.md) |
+| Modelo dimensional y modelos dbt | **Pendiente — Rol B** | [Modelo del Data Warehouse](#modelo-del-data-warehouse) |
+| Pruebas y documentación dbt | **Pendiente — Rol B** | [Estructura del proyecto dbt](#estructura-del-proyecto-dbt) |
+| Consultas analíticas y de validación | **Pendiente — Rol B** | [Consultas analíticas y validación](#consultas-analíticas-y-validación) |
+| Justificación de diseño del modelo | **Pendiente — Rol B** | [Justificación de diseño](#justificación-de-diseño) |
+
+El Rol B tiene su punto de partida en [docs/guia_rol_b.md](docs/guia_rol_b.md).
+
 ---
 
 ## Manual de implementación
@@ -331,4 +370,69 @@ docker compose up -d
   Los scripts de `/docker-entrypoint-initdb.d/` solo se ejecutan cuando el volumen de base de datos está vacío. Si se crearon antes de montar el script, ejecute un reinicio limpio con `docker compose down -v` y vuelva a iniciar.
 - **Variable requerida faltante:**
   Si falta alguna variable obligatoria en `.env`, `docker compose config` o `docker compose up` fallará indicando el nombre exacto de la variable que debe definirse.
+
+---
+
+## Modelo del Data Warehouse
+
+> **Pendiente — Rol B.** Esta sección debe describir el modelo dimensional: tablas de hechos, dimensiones, granularidad, claves y relaciones, con su diagrama.
+
+Lo que ya existe en el Data Warehouse `sgfood_dw`:
+
+| Schema | Contenido actual | Lo crea |
+|--------|------------------|---------|
+| `raw` | 12 tablas con los datos oficiales, todas las columnas de negocio como texto | DDL (`sql/ddl/`) y carga con Python |
+| `staging` | Un modelo de ejemplo, `stg_oltp__sucursal` | dbt |
+| `marts` | Vacío | dbt |
+
+## Estructura del proyecto dbt
+
+> **Pendiente — Rol B.** Esta sección debe describir los modelos por capa, las materializaciones elegidas, las pruebas de calidad y la documentación generada con `dbt docs`.
+
+El punto de partida está en la sección 9 y en [dbt_project/README.md](dbt_project/README.md).
+
+## Consultas analíticas y validación
+
+> **Pendiente — Rol B.** Esta sección debe presentar las consultas analíticas, las consultas de validación y sus resultados.
+
+Validaciones que ya ejecuta el pipeline:
+
+| Validación | Qué comprueba | Dónde |
+|------------|---------------|-------|
+| Conteo por tabla durante la carga | Filas cargadas en `raw` iguales a las leídas de la fuente; si no coinciden, la carga se revierte | `sgfood_ingesta` |
+| `validar_carga_raw` | Filas de cada fuente iguales a las de su tabla en `raw`, para las 12 tablas | Tarea del DAG |
+| `dbt_test` | Pruebas definidas en el proyecto dbt | Tarea del DAG |
+| `validar_marts` | Cada consulta de `sql/validaciones/dag/` devuelve cero filas | Tarea del DAG |
+
+## Justificación de diseño
+
+> **Pendiente — Rol B** para el modelo dimensional y las decisiones de dbt.
+
+Decisiones de la ingesta y la orquestación:
+
+| Decisión | Motivo |
+|----------|--------|
+| ELT en lugar de ETL | Python solo extrae y carga; las reglas de negocio viven en dbt, donde quedan versionadas, probadas y documentadas |
+| `raw` con todas las columnas como texto | Un valor inválido llega a `raw` y lo detecta una prueba dbt, en lugar de detener la carga |
+| Truncado y recarga en una transacción por tabla | La carga es idempotente y, si falla, la tabla conserva los datos anteriores |
+| Ingesta guiada por `fuentes.yml` | Agregar una fuente no requiere tocar código ni el DAG |
+| Una tarea de Airflow por fuente | Reintento y registro por tabla |
+| `dbt run` y `dbt test` como tareas separadas | Un fallo de modelo y uno de calidad de datos quedan distinguidos |
+| dbt en un entorno virtual aislado | Evita conflictos de dependencias con Airflow |
+| Validaciones finales como archivos SQL | Se agregan validaciones sin modificar el DAG |
+
+## Evidencia de ejecución
+
+Los archivos están en [evidencia/](evidencia/).
+
+| Archivo | Contenido |
+|---------|-----------|
+| `carga_completa.txt` | Registro de una carga completa a `raw` |
+| `conteo_tablas_raw.txt` | Filas por tabla de `raw` y total |
+| `dag_tareas_y_dependencias.txt` | Tareas del DAG y sus dependencias |
+| `dag_estados_tareas.txt` | Estado de cada tarea en una ejecución completa |
+| `dag_log_dbt_run.txt`, `dag_log_dbt_test.txt`, `dag_log_validar_marts.txt` | Registros de las tareas de dbt y de validación |
+| `dbt_run_ejecucion_real.txt` | Ejecución de dbt sobre el esqueleto del proyecto |
+
+> **Pendiente:** capturas de la interfaz de Airflow con el grafo del DAG y una ejecución exitosa, y la evidencia del Rol B.
 

@@ -112,6 +112,7 @@ Cambiar una decisión acordada es un tema de zona amarilla.
 | `Proyecto1/data/` | A | Datos oficiales: script de la BD fuente, CSV y catálogo. No se editan a mano |
 | `Proyecto1/dbt_project/**` | B | `sources.yml`, modelos, pruebas, macros, documentación dbt. El esqueleto inicial lo arma A (decisión D11) |
 | `Proyecto1/docs/guia_rol_b.md` | A | Guía de arranque para B: entorno, datos, convenciones e interfaz |
+| `Proyecto1/tests/` | A | Pruebas de entorno, contrato, ingesta y DAG. No dependen del contenido de `dbt_project/` |
 | Diseño del modelo dimensional | B | Hechos, dimensiones, granularidad, bus matrix |
 | `Proyecto1/sql/validaciones/` y consultas analíticas | B | Conteos, integridad referencial, resultados de negocio |
 | README: pipeline, DAG, Python, manual de implementación | A | B revisa |
@@ -139,7 +140,7 @@ La zona se determina respecto al rol activo.
 | Nombres de variables de entorno de conexión | Los comparten Python, Airflow y dbt | Ambos |
 | Tarea del DAG que ejecuta `dbt run` y `dbt test` | La tarea es de A; comandos, selectores y orden son de B | A implementa, B define |
 | Tarea de validaciones por conteo | La tarea es de A; reutiliza SQL de B | A implementa, B revisa |
-| Decisiones acordadas D1 a D7 | Condicionan el trabajo de los dos | Ambos |
+| Decisiones acordadas D1 a D11 | Condicionan el trabajo de los dos | Ambos |
 | Estructura de carpetas de `Proyecto1/` y del README | Entregable único de la pareja | Ambos |
 | Versiones fijadas y dependencias Python que afectan a dbt | dbt corre en el entorno que construye A | Ambos |
 | Estos documentos de `.specs/steering/` | Rigen el trabajo de los dos | Ambos |
@@ -193,19 +194,56 @@ El trabajo de los dos se toca solo en cuatro puntos. Fuera de ellos, cada uno ca
 
 | # | Punto | Entrega A | Entrega B |
 |---|-------|-----------|-----------|
-| 1 | Entorno | `docker compose up` funcional con los tres schemas creados (entregado) | Proyecto dbt que se conecta al DW |
-| 2 | Contrato raw `v1` | Tablas y columnas de `raw`, DDL y BD fuente poblada (entregado) | Validación; `sources.yml` |
-| 3 | Datos en `raw` | Carga con Python de las 12 tablas (entregado) | `staging` y `marts` sobre datos reales |
-| 4 | dbt en el DAG | Tareas `dbt run` y `dbt test` (entregado) | Proyecto ejecutable y comandos definidos |
-| 5 | Validaciones | Tarea de conteos en el DAG y validaciones SQL (entregado) | Consultas de validación y analíticas |
-| 6 | Cierre | README de ingesta y evidencias (entregado) | README de modelado, evidencias, `dbt docs` |
+| 1 | Entorno | `docker compose up` funcional con los tres schemas creados (entregado) | Proyecto dbt que se conecta al DW (resuelto por el esqueleto, D11) |
+| 2 | Contrato raw `v1` | Tablas y columnas de `raw`, DDL y BD fuente poblada (entregado) | Fuentes declaradas en dbt (resuelto por el esqueleto); descripciones y pruebas de fuentes (pendiente) |
+| 3 | Datos en `raw` | Carga con Python de las 12 tablas (entregado) | `staging`, `intermediate` y `marts` sobre datos reales (pendiente) |
+| 4 | dbt en el DAG | Tareas `dbt deps`, `dbt run` y `dbt test` (entregado) | Modelos y pruebas del proyecto (pendiente) |
+| 5 | Validaciones | Tarea de conteos y tarea de validaciones SQL en el DAG (entregado) | Consultas de validación y analíticas (pendiente) |
+| 6 | Cierre | README de ingesta, DAG y evidencias (entregado; faltan capturas) | README de modelado, evidencias, `dbt docs` (pendiente) |
 
-Features previstas del rol A, en orden: `entorno-base` (terminada), `contrato-raw` (terminada), `ingesta-raw` (terminada), `dag-orquestacion` (terminada).
+## Estado al 2026-10-10
+
+**Rol A: las cuatro features están terminadas y revisadas.**
+
+| Feature | Qué dejó | Spec |
+|---------|----------|------|
+| `entorno-base` | Docker Compose con DW, BD fuente y Airflow 3.3.2; dbt aislado; schemas creados | `.specs/features/entorno-base/` |
+| `contrato-raw` | Datos oficiales versionados, BD fuente poblada, 12 tablas en `raw`, contrato `v1` | `.specs/features/contrato-raw/` |
+| `ingesta-raw` | Paquete `sgfood_ingesta`: extracción y carga de las 12 tablas, 8.864 filas | `.specs/features/ingesta-raw/` |
+| `dag-orquestacion` | DAG `sgfood_elt` de 17 tareas, validaciones, esqueleto dbt y guía para B | `.specs/features/dag-orquestacion/` |
+
+**Rol B: no ha comenzado.** Su punto de partida es `Proyecto1/docs/guia_rol_b.md`, que incluye la lista de lo que le corresponde.
 
 ## Pendientes
 
+**Del rol A**
+
+- [ ] Abrir el pull request de `feat/ingesta-airflow` hacia `main` y avisar a B. Sin ese merge, B no tiene de dónde partir.
+- [ ] Tomar las capturas de la interfaz de Airflow: grafo del DAG y ejecución exitosa.
+- [ ] Revisar el pull request de B cuando llegue.
+
+**Del rol B**
+
+- [ ] Diseñar el modelo dimensional: hechos, dimensiones y granularidad.
+- [ ] Modelos `staging` de las 11 tablas restantes, modelos `intermediate` y `marts`.
+- [ ] Materializaciones, incluida al menos una incremental donde aplique.
+- [ ] Pruebas dbt: `unique`, `not_null`, `relationships`, `accepted_values` y una personalizada.
+- [ ] Documentación dbt y `dbt docs generate`.
+- [ ] Consultas analíticas y de validación en `sql/validaciones/`.
+- [ ] Secciones del README: modelo del DW, estructura dbt y justificación de diseño.
+- [ ] Evidencia de su parte.
+- [ ] Decidir dónde se materializa la capa intermediate. Hoy no tiene schema asignado y caería en `public`.
+- [ ] Decidir si se usan los casos de calidad opcionales y cómo.
+
+**De ambos**
+
+- [ ] Ejecutar `sgfood_elt` con el proyecto dbt completo y guardar la evidencia.
+- [ ] Revisión cruzada final: cada uno debe poder explicar el pipeline entero.
+- [ ] Entrega en UEDI.
+
+**Resueltos**
+
 - [x] Recibir el archivo de datos oficial.
-- [x] Redactar y validar el contrato raw `v1`.
+- [x] Redactar el contrato raw `v1`.
 - [x] Verificar y fijar las versiones del entorno (D7).
-- [ ] Decidir si se usan los casos de calidad opcionales y cómo (B).
-- [ ] Definir dónde se materializa la capa intermediate (B).
+- [x] Definir cómo ejecuta el DAG a dbt y a las validaciones (D9, D10).

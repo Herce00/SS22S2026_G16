@@ -19,13 +19,20 @@ Proyecto1/
 ├── README.md
 ├── docker-compose.yml
 ├── .env.example
-├── docs/           contrato_raw.md
+├── data/           datos oficiales, no se editan       (A)
+├── docs/           contrato_raw.md, guia_rol_b.md
 ├── sql/
 │   ├── ddl/            schemas y tablas raw            (A)
 │   └── validaciones/   validaciones y consultas        (B)
-├── python/         extracción, carga y configuración   (A)
-├── airflow/dags/                                       (A)
+│       └── dag/        validaciones que ejecuta el DAG (B)
+├── python/
+│   ├── config/         fuentes.yml                     (A, parte del contrato)
+│   └── sgfood_ingesta/ extracción, carga y validación  (A)
+├── airflow/
+│   ├── Dockerfile      imagen con dbt aislado          (A)
+│   └── dags/           sgfood_elt.py                   (A)
 ├── dbt_project/    models/staging, intermediate, marts (B)
+├── tests/          entorno, contrato, ingesta, dag     (A)
 └── evidencia/
 ```
 
@@ -129,6 +136,7 @@ B puede ajustar las convenciones internas de dbt; un cambio que afecte al DAG o 
 - Documentación del proyecto en español, tono técnico y neutro.
 - Cada sección del README tiene un dueño (mapa de propiedad en [architecture.md](architecture.md)); el otro integrante la revisa.
 - La evidencia va en `Proyecto1/evidencia/` con nombres descriptivos: `dag_ejecucion_exitosa.png`, `dbt_test_resultado.png`.
+- Las salidas de texto se guardan como `.txt`: el `.gitignore` de la raíz excluye `*.log` y esos archivos no llegarían al repositorio.
 - No se inventan cifras: todo conteo o resultado citado debe provenir de una ejecución real sobre los datos oficiales de `Proyecto1/data/`.
 - Los archivos de `Proyecto1/data/` se versionan tal como los entregó el curso y no se editan a mano.
 - Los CSV se leen como `utf-8-sig` porque incluyen BOM.
