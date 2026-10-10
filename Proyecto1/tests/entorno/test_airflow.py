@@ -77,8 +77,10 @@ def test_airflow_services_healthy_and_functional(proyecto1_dir):
             time.sleep(2)
     assert ok, f"No se pudo consultar {health_url}: {last_err}"
 
-    # Verificar que la lista de DAGs está verdaderamente vacía
+    # Verificar que el único DAG registrado sea sgfood_elt
     res_dags = run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "dags", "list", "-o", "json", cwd=proyecto1_dir)
     assert res_dags.returncode == 0
     dags_list = json.loads(res_dags.stdout)
-    assert len(dags_list) == 0, f"Se esperaba lista de DAGs vacía pero contiene: {dags_list}"
+    dag_ids = [d.get("dag_id") for d in dags_list]
+    assert dag_ids == ["sgfood_elt"], f"Se esperaba únicamente ['sgfood_elt'] pero contiene: {dag_ids}"
+

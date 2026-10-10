@@ -71,16 +71,16 @@ Las rutas son relativas a `Proyecto1/` y los comandos se ejecutan desde esa carp
 
 ## T4 — DAG con tareas de carga
 
-- [ ] **Rojo (estructura):** `tests/dag/test_estructura_dag.py`:
+- [x] **Rojo (estructura):** `tests/dag/test_estructura_dag.py`:
   - Airflow no reporta errores de importación.
   - Existe el DAG `sgfood_elt`, en pausa, con programación diaria y sin ejecución de periodos anteriores.
   - Una sola ejecución activa y cuatro tareas activas como máximo.
   - Hay una tarea `carga_raw.cargar_<tabla>` por cada fuente de `fuentes.yml`, y ninguna más.
   - Cada tarea de carga tiene 2 reintentos y tiempo límite.
   - El archivo del DAG no contiene nombres de tablas, SQL ni credenciales.
-- [ ] **Rojo (ajuste):** `tests/entorno/test_airflow.py` pasa a exigir que el único DAG sea `sgfood_elt`; ajustar la comprobación final de `tests/entorno/test_ejecucion_tareas.py`.
-- [ ] **Verde:** crear `airflow/dags/sgfood_elt.py` con las tareas de carga.
-- [ ] **Rojo y verde (ejecución):** disparar el DAG y exigir que las 12 tareas de carga terminen en `success`, que `raw` tenga 8864 filas y un único `_loaded_at` igual al inicio de la ejecución.
+- [x] **Rojo (ajuste):** `tests/entorno/test_airflow.py` pasa a exigir que el único DAG sea `sgfood_elt`; ajustar la comprobación final de `tests/entorno/test_ejecucion_tareas.py`.
+- [x] **Verde:** crear `airflow/dags/sgfood_elt.py` con las tareas de carga.
+- [x] **Rojo y verde (ejecución):** disparar el DAG y exigir que las 12 tareas de carga terminen en `success`, que `raw` tenga 8864 filas y un único `_loaded_at` igual al inicio de la ejecución.
 
 **Verificación:** `pytest tests/dag -k "estructura"` y `pytest tests/entorno`.
 **Commit:** `feat(p1-dag): add sgfood_elt dag with raw load tasks`

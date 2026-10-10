@@ -67,7 +67,9 @@ def test_ejecucion_tarea_smoke_dag(proyecto1_dir):
             os.remove(dest_dag)
         run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "dags", "delete", "-y", dag_id, cwd=proyecto1_dir)
 
-    # Verificar que el DAG de humo no quede en la lista de DAGs fuera de la prueba
+    # Verificar que el DAG de humo no quede en la lista de DAGs fuera de la prueba y que sgfood_elt permanezca
     res_final_list = run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "dags", "list", "-o", "json", cwd=proyecto1_dir)
     assert res_final_list.returncode == 0
     assert dag_id not in res_final_list.stdout, f"El DAG {dag_id} no debe quedar cargado fuera de la prueba"
+    assert "sgfood_elt" in res_final_list.stdout, "El DAG sgfood_elt debe permanecer en Airflow"
+
