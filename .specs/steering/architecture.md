@@ -86,6 +86,11 @@ Formato de los CSV: separador coma, UTF-8 **con BOM**, fin de línea CRLF, una f
 | D6 | dbt desde Airflow | `BashOperator` con `dbt run` y `dbt test`. | Sin dependencias adicionales. |
 | D7 | Versiones | Verificadas y fijadas en [tech-stack.md](tech-stack.md). | Evitar incompatibilidades entre Airflow, Python y dbt. |
 | D8 | Casos de calidad opcionales | `casos_calidad_opcionales.csv` no se carga en la corrida principal. Su uso para probar la calidad de datos es opcional y lo define B. | Lo indica el catálogo oficial; mezclarlos alteraría las cifras reales. |
+| D9 | Ejecución de dbt en el DAG | El DAG ejecuta `dbt deps` (solo si existe `packages.yml`), `dbt run` y `dbt test` sobre el proyecto completo, sin selectores. `profiles.yml` vive dentro de `dbt_project/` y lee las variables `DW_*`. | El DAG no conoce modelos concretos: B cambia el proyecto sin tocar el DAG. |
+| D10 | Validaciones finales | El DAG ejecuta cada archivo `.sql` de `Proyecto1/sql/validaciones/dag/`. Una validación pasa si su consulta devuelve cero filas. | B agrega o quita validaciones sin tocar el DAG. |
+| D11 | Esqueleto del proyecto dbt | A deja armado un esqueleto mínimo en `Proyecto1/dbt_project/` a pedido de B. Desde su entrega, el proyecto es propiedad de B. | B arranca con el proyecto conectado y ejecutable. |
+
+D9, D10 y D11 las definió A el 2026-10-10 como punto de partida, porque B aún no había comenzado. B puede cambiarlas por el procedimiento normal de zona amarilla.
 
 Consecuencias que cada rol debe tener presentes:
 
@@ -105,7 +110,8 @@ Cambiar una decisión acordada es un tema de zona amarilla.
 | `Proyecto1/python/` | A | Extracción, carga de CSV, limpieza técnica, configuración de fuentes |
 | `Proyecto1/airflow/dags/` | A | DAG: tareas, dependencias, reintentos, errores, logs, programación |
 | `Proyecto1/data/` | A | Datos oficiales: script de la BD fuente, CSV y catálogo. No se editan a mano |
-| `Proyecto1/dbt_project/**` | B | `sources.yml`, modelos, pruebas, macros, documentación dbt |
+| `Proyecto1/dbt_project/**` | B | `sources.yml`, modelos, pruebas, macros, documentación dbt. El esqueleto inicial lo arma A (decisión D11) |
+| `Proyecto1/docs/guia_rol_b.md` | A | Guía de arranque para B: entorno, datos, convenciones e interfaz |
 | Diseño del modelo dimensional | B | Hechos, dimensiones, granularidad, bus matrix |
 | `Proyecto1/sql/validaciones/` y consultas analíticas | B | Conteos, integridad referencial, resultados de negocio |
 | README: pipeline, DAG, Python, manual de implementación | A | B revisa |
@@ -151,6 +157,37 @@ La zona se determina respecto al rol activo.
 Se reporta al dueño con evidencia (archivo, línea, consulta o comando que lo reproduce) y se propone el cambio. No se corrige por cuenta propia, aunque el arreglo sea trivial.
 
 **Apoyo cruzado:** si un integrante termina antes, puede ayudar en la parte del otro, pero solo a pedido del dueño y mediante pull request hacia su rama.
+
+## Interfaz entre A y B
+
+El trabajo de los dos se toca solo en cuatro puntos. Fuera de ellos, cada uno cambia lo suyo sin afectar al otro.
+
+| Punto de contacto | Lo define | Dónde está |
+|-------------------|-----------|-----------|
+| Tablas y columnas de `raw` | Contrato raw | `Proyecto1/docs/contrato_raw.md`, `Proyecto1/python/config/fuentes.yml` |
+| Conexión de dbt al DW | Variables `DW_*` | `.env.example`, `dbt_project/profiles.yml` |
+| Cómo ejecuta el DAG a dbt | Decisión D9 | `airflow/dags/sgfood_elt.py` |
+| Cómo ejecuta el DAG las validaciones | Decisión D10 | `sql/validaciones/dag/` |
+
+**B puede cambiar sin avisar ni afectar a A:**
+
+- Modelos, capas, nombres de modelos y materializaciones.
+- Diseño dimensional: hechos, dimensiones y granularidad.
+- Pruebas dbt, macros, paquetes y documentación.
+- Dónde se materializa la capa intermediate y qué schemas adicionales usa dbt.
+- Archivos de validación en `sql/validaciones/dag/` y consultas analíticas.
+- Uso de los casos de calidad opcionales.
+
+**B necesita acordarlo con A:**
+
+- Cambiar tablas o columnas de `raw`, o pedir columnas de auditoría nuevas.
+- Cambiar los nombres de los schemas `raw`, `staging` o `marts`, o de las variables `DW_*`.
+- Necesitar argumentos de dbt distintos en el DAG (selectores, variables, objetivos).
+- Mover `profiles.yml` o el proyecto dbt a otra ruta.
+- Cambiar la convención de las validaciones finales.
+- Agregar dependencias Python o cambiar versiones fijadas.
+
+**A puede cambiar sin afectar a B:** el código de ingesta, el DAG, los reintentos, la programación y la infraestructura, mientras se respeten los cuatro puntos de contacto.
 
 ## Puntos de integración
 
