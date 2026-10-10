@@ -121,7 +121,17 @@ with DAG(
         execution_timeout=timedelta(minutes=20),
     )
 
+    # 4. Validación final de marts
+    @task(task_id="validar_marts", retries=0, execution_timeout=timedelta(minutes=10))
+    def validar_marts(**context) -> None:
+        from sgfood_ingesta.validacion import validar_sql
+        params = context.get("params") or {}
+        carpeta = params.get("validaciones_dir", "/opt/airflow/sql/validaciones/dag")
+        validar_sql(carpeta=str(carpeta))
+
+    t_validar_marts = validar_marts()
+
     # Dependencias del pipeline ELT
-    carga_raw >> t_validar_carga_raw >> dbt_deps >> dbt_run >> dbt_test
+    carga_raw >> t_validar_carga_raw >> dbt_deps >> dbt_run >> dbt_test >> t_validar_marts
 
 

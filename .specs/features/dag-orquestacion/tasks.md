@@ -109,12 +109,12 @@ Las rutas son relativas a `Proyecto1/` y los comandos se ejecutan desde esa carp
 
 ## T7 — Validaciones finales en el DAG
 
-- [ ] **Rojo (estática):** el compose monta `./sql` en `/opt/airflow/sql` como solo lectura en los servicios de Airflow.
-- [ ] **Rojo (estructura):** `validar_marts` existe, depende de `dbt_test` y no tiene reintentos.
-- [ ] **Rojo (ejecución):**
+- [x] **Rojo (estática):** el compose monta `./sql` en `/opt/airflow/sql` como solo lectura en los servicios de Airflow.
+- [x] **Rojo (estructura):** `validar_marts` existe, depende de `dbt_test` y no tiene reintentos.
+- [x] **Rojo (ejecución):**
   - Con `validaciones_dir` apuntando a `validaciones_ok`: `validar_marts` termina en `success`.
   - Con la carpeta predeterminada vacía: termina en `success` y su registro contiene la advertencia.
-- [ ] **Verde:** agregar la tarea, el parámetro y el montaje.
+- [x] **Verde:** agregar la tarea, el parámetro y el montaje.
 
 **Verificación:** `pytest tests/dag -k "ejecucion"` y `pytest tests/entorno`.
 **Commit:** `feat(p1-dag): run final sql validations from the dag`

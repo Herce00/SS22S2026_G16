@@ -25,17 +25,20 @@ def test_ejecucion_tareas_carga_raw(proyecto1_dir):
         )
         assert res_unpause.returncode == 0, f"Error al despausar {dag_id}: {res_unpause.stderr}"
 
-        # 2. Preparar fixture dbt_ok en el contenedor scheduler
+        # 2. Preparar fixture dbt_ok y validaciones_ok en el contenedor scheduler
         import subprocess
         fixture_dbt = os.path.join(proyecto1_dir, "tests", "dag", "fixtures", "dbt_ok")
+        fixture_val = os.path.join(proyecto1_dir, "tests", "dag", "fixtures", "validaciones_ok")
         run_docker_compose("exec", "-T", "airflow-scheduler", "mkdir", "-p", "/tmp/fixtures", cwd=proyecto1_dir)
         subprocess.run(["docker", "cp", fixture_dbt, "sgfood_airflow_scheduler:/tmp/fixtures/dbt_ok"], check=True)
+        subprocess.run(["docker", "cp", fixture_val, "sgfood_airflow_scheduler:/tmp/fixtures/validaciones_ok"], check=True)
         run_docker_compose("exec", "-T", "--user", "0", "airflow-scheduler", "chown", "-R", "airflow:root", "/tmp/fixtures", cwd=proyecto1_dir)
 
-        # 3. Disparar el DAG con parámetros hacia dbt_ok
+        # 3. Disparar el DAG con parámetros hacia dbt_ok y validaciones_ok
         conf_str = json.dumps({
             "dbt_project_dir": "/tmp/fixtures/dbt_ok",
             "dbt_profiles_dir": "/tmp/fixtures/dbt_ok",
+            "validaciones_dir": "/tmp/fixtures/validaciones_ok",
         })
         res_trig = run_docker_compose(
             "exec", "-T", "airflow-scheduler", "airflow", "dags", "trigger", dag_id, "--conf", conf_str, "-o", "json",
@@ -113,6 +116,12 @@ def test_ejecucion_tareas_carga_raw(proyecto1_dir):
                 f"Tarea {dbt_task} terminó con estado '{estados_por_tarea[dbt_task]}', se esperaba 'success'"
             )
 
+        # T7: Verificar validar_marts
+        assert "validar_marts" in estados_por_tarea, "Tarea validar_marts no encontrada"
+        assert estados_por_tarea["validar_marts"] == "success", (
+            f"validar_marts terminó con estado '{estados_por_tarea['validar_marts']}', se esperaba 'success'"
+        )
+
         # Buscar archivos de log de validar_carga_raw y dbt_run para este run
         logs_base = os.path.join(proyecto1_dir, "airflow", "logs", "dag_id=sgfood_elt")
         log_encontrado = False
@@ -189,3 +198,90 @@ def test_ejecucion_tareas_carga_raw(proyecto1_dir):
             "exec", "-T", "airflow-scheduler", "airflow", "dags", "pause", "-y", dag_id,
             cwd=proyecto1_dir
         )
+
+
+@pytest.mark.integracion
+def test_ejecucion_validar_marts_carpeta_vacia(proyecto1_dir):
+    """Verifica que con la carpeta predeterminada vacía, validar_marts termina en success y su registro contiene la advertencia."""
+    dag_id = "sgfood_elt"
+    run_id = None
+
+    try:
+        run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "dags", "unpause", "-y", dag_id, cwd=proyecto1_dir)
+
+        # Disparar usando la carpeta predeterminada (vacía con .gitkeep)
+        conf_str = json.dumps({
+            "dbt_project_dir": "/tmp/fixtures/dbt_ok",
+            "dbt_profiles_dir": "/tmp/fixtures/dbt_ok",
+        })
+        res_trig = run_docker_compose(
+            "exec", "-T", "airflow-scheduler", "airflow", "dags", "trigger", dag_id, "--conf", conf_str, "-o", "json",
+            cwd=proyecto1_dir
+        )
+        assert res_trig.returncode == 0, f"Error al disparar: {res_trig.stderr}"
+        lineas_trig = [l.strip() for l in res_trig.stdout.splitlines() if (l.strip().startswith("[") and l.strip().endswith("]")) or (l.strip().startswith("{") and l.strip().endswith("}"))]
+        if lineas_trig:
+            try:
+                trig_data = json.loads(lineas_trig[-1])
+                if isinstance(trig_data, list) and len(trig_data) > 0:
+                    run_id = trig_data[0].get("dag_run_id") or trig_data[0].get("run_id")
+                elif isinstance(trig_data, dict):
+                    run_id = trig_data.get("dag_run_id") or trig_data.get("run_id")
+            except json.JSONDecodeError:
+                pass
+        assert run_id, f"No se pudo obtener run_id:\n{res_trig.stdout}"
+
+        # Esperar finalización
+        estado_final = None
+        start_time = time.time()
+        while time.time() - start_time < 120:
+            res_runs = run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "dags", "list-runs", dag_id, "-o", "json", cwd=proyecto1_dir)
+            if res_runs.returncode == 0:
+                lineas_runs = [l.strip() for l in res_runs.stdout.splitlines() if (l.strip().startswith("[") and l.strip().endswith("]")) or (l.strip().startswith("{") and l.strip().endswith("}"))]
+                if lineas_runs:
+                    try:
+                        runs = json.loads(lineas_runs[-1])
+                        for r in runs:
+                            curr_id = r.get("dag_run_id") or r.get("run_id")
+                            if curr_id == run_id:
+                                st = r.get("state")
+                                if st in ["success", "failed"]:
+                                    estado_final = st
+                                    break
+                        if estado_final:
+                            break
+                    except json.JSONDecodeError:
+                        pass
+            time.sleep(3)
+
+        assert estado_final == "success", f"La ejecución terminó con estado '{estado_final}', se esperaba 'success'"
+
+        # Verificar que validar_marts terminó en success
+        res_tis = run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "tasks", "states-for-dag-run", dag_id, run_id, "-o", "json", cwd=proyecto1_dir)
+        lineas_tis = [l.strip() for l in res_tis.stdout.splitlines() if (l.strip().startswith("[") and l.strip().endswith("]")) or (l.strip().startswith("{") and l.strip().endswith("}"))]
+        tis_data = json.loads(lineas_tis[-1])
+        estados = {ti.get("task_id"): ti.get("state") for ti in tis_data}
+        assert estados.get("validar_marts") == "success", f"validar_marts terminó en '{estados.get('validar_marts')}', se esperaba 'success'"
+
+        # Verificar advertencia en log de validar_marts
+        logs_base = os.path.join(proyecto1_dir, "airflow", "logs", "dag_id=sgfood_elt")
+        contenido_vm_log = ""
+        vm_log_encontrado = False
+        for root, dirs, files in os.walk(logs_base):
+            if "task_id=validar_marts" in root:
+                for file in files:
+                    if file.endswith(".log"):
+                        with open(os.path.join(root, file), "r", encoding="utf-8", errors="ignore") as lf:
+                            contenido_vm_log += lf.read()
+                        vm_log_encontrado = True
+
+        assert vm_log_encontrado, f"No se encontró archivo de log para validar_marts en {logs_base}"
+        assert ("No se encontraron archivos .sql en la carpeta de validaciones" in contenido_vm_log or
+                "La carpeta de validaciones SQL no existe" in contenido_vm_log), (
+            f"El log de validar_marts no contiene la advertencia esperada:\n{contenido_vm_log}"
+        )
+
+    finally:
+        run_docker_compose("exec", "-T", "dw", "psql", "-U", "dw_user", "-d", "sgfood_dw", "-c", "DROP SCHEMA IF EXISTS dag_test CASCADE;", cwd=proyecto1_dir)
+        run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "dags", "pause", "-y", dag_id, cwd=proyecto1_dir)
+

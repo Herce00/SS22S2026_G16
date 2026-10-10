@@ -154,3 +154,19 @@ def test_pytest_ini_excludes_lenta_by_default(proyecto1_dir):
         content = f.read()
     assert 'addopts = -m "not lenta"' in content, "pytest.ini debe excluir pruebas lentas por defecto con addopts = -m \"not lenta\""
 
+
+def test_compose_monta_sql_en_airflow_ro(proyecto1_dir):
+    """Verifica que el compose monte ./sql en /opt/airflow/sql como solo lectura en los servicios de Airflow."""
+    compose_path = os.path.join(proyecto1_dir, "docker-compose.yml")
+    with open(compose_path, "r", encoding="utf-8") as f:
+        compose = yaml.safe_load(f)
+
+    common_volumes = compose.get("x-airflow-common", {}).get("volumes", [])
+    sql_mounted_ro = any(
+        (v == "./sql:/opt/airflow/sql:ro" or
+         (isinstance(v, dict) and v.get("target") == "/opt/airflow/sql" and v.get("read_only") is True))
+        for v in common_volumes
+    )
+    assert sql_mounted_ro, "x-airflow-common debe montar ./sql en /opt/airflow/sql como solo lectura (:ro)"
+
+

@@ -75,6 +75,7 @@ def test_montajes_airflow(proyecto1_dir):
         "/opt/airflow/python",
         "/opt/airflow/dbt_project",
         "/opt/airflow/data",
+        "/opt/airflow/sql",
     ]
     cmd = f"test -d {' && test -d '.join(dirs_to_check)}"
     res = run_docker_compose("exec", "-T", "airflow-scheduler", "bash", "-c", cmd, cwd=proyecto1_dir)

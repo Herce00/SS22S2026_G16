@@ -81,6 +81,7 @@ def test_estructura_y_configuracion_dag(proyecto1_dir):
         "dbt_deps = dag.get_task('dbt_deps') if 'dbt_deps' in dag.task_dict else None\n"
         "dbt_run = dag.get_task('dbt_run') if 'dbt_run' in dag.task_dict else None\n"
         "dbt_test = dag.get_task('dbt_test') if 'dbt_test' in dag.task_dict else None\n"
+        "validar_marts = dag.get_task('validar_marts') if 'validar_marts' in dag.task_dict else None\n"
         "info = {\n"
         "    'dag_id': dag.dag_id,\n"
         "    'is_paused': dag.is_paused_upon_creation,\n"
@@ -98,6 +99,7 @@ def test_estructura_y_configuracion_dag(proyecto1_dir):
         "    'dbt_deps': {'exists': dbt_deps is not None, 'cmd': getattr(dbt_deps, 'bash_command', ''), 'retries': getattr(dbt_deps, 'retries', None), 'upstreams': list(dbt_deps.upstream_task_ids) if dbt_deps else []},\n"
         "    'dbt_run': {'exists': dbt_run is not None, 'cmd': getattr(dbt_run, 'bash_command', ''), 'retries': getattr(dbt_run, 'retries', None), 'upstreams': list(dbt_run.upstream_task_ids) if dbt_run else []},\n"
         "    'dbt_test': {'exists': dbt_test is not None, 'cmd': getattr(dbt_test, 'bash_command', ''), 'retries': getattr(dbt_test, 'retries', None), 'upstreams': list(dbt_test.upstream_task_ids) if dbt_test else []},\n"
+        "    'validar_marts': {'exists': validar_marts is not None, 'retries': getattr(validar_marts, 'retries', None), 'timeout': int(validar_marts.execution_timeout.total_seconds()) if (validar_marts and validar_marts.execution_timeout) else None, 'upstreams': list(validar_marts.upstream_task_ids) if validar_marts else []},\n"
         "}\n"
         "print(json.dumps(info))\n"
     )
@@ -151,5 +153,12 @@ def test_estructura_y_configuracion_dag(proyecto1_dir):
         assert "; true" not in cmd and ";true" not in cmd, f"{task_name} no debe contener '; true': {cmd}"
 
     assert data["dbt_test"]["retries"] == 0, "dbt_test no debe tener reintentos"
+
+    # T7: Verificar validar_marts
+    assert data["validar_marts"]["exists"] is True, "La tarea 'validar_marts' debe existir en el DAG"
+    assert "dbt_test" in data["validar_marts"]["upstreams"], "validar_marts debe depender de dbt_test"
+    assert data["validar_marts"]["retries"] == 0, "validar_marts no debe tener reintentos"
+    assert data["validar_marts"]["timeout"] == 600, "validar_marts debe tener timeout de 10 minutos (600s)"
+
 
 

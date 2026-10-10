@@ -33,6 +33,7 @@ x-airflow-common: &airflow-common
     - ./dbt_project:/opt/airflow/dbt_project
     - ./data:/opt/airflow/data
     - ./airflow/logs:/opt/airflow/logs
+    - ./sql:/opt/airflow/sql:ro
 
 services:
   dw:
