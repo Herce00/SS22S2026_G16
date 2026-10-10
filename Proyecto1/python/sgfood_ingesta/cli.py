@@ -9,6 +9,9 @@ from sgfood_ingesta.errores import ConfiguracionInvalida, ErrorIngesta, FuenteDe
 from sgfood_ingesta.ingesta import cargar_fuente, cargar_todas
 
 
+logger = logging.getLogger(__name__)
+
+
 def configurar_logging() -> None:
     logging.basicConfig(
         level=logging.INFO,
@@ -66,10 +69,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         sys.stderr.write(f"Error de configuracion/argumentos: {exc}\n")
         return 2
     except ErrorIngesta as exc:
-        sys.stderr.write(f"Error durante la ingesta: {exc}\n")
+        logger.error("Error durante la ingesta: %s", exc)
         return 1
-    except Exception as exc:
-        sys.stderr.write(f"Fallo inesperado durante la ingesta: {exc}\n")
+    except Exception:
+        # La traza completa es lo que permite diagnosticar errores de base de datos o de red.
+        logger.exception("Fallo inesperado durante la ingesta")
         return 1
 
 

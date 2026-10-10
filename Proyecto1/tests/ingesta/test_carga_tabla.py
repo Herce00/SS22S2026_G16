@@ -43,6 +43,15 @@ def test_src_healthcheck_checks_venta_detalle(proyecto1_dir):
     assert "venta_detalle" in test_str, (
         f"El healthcheck de src debe comprobar oltp_sgfood.venta_detalle, encontrado: {test_str}"
     )
+    # Una consulta que devuelve cero filas tambien termina con exito: el resultado debe evaluarse.
+    assert "grep -q" in test_str, (
+        f"El healthcheck de src debe fallar si la tabla esta vacia, encontrado: {test_str}"
+    )
+    # Durante los scripts de inicializacion PostgreSQL solo atiende por socket local;
+    # consultar por TCP garantiza que la inicializacion ya termino.
+    assert "-h 127.0.0.1" in test_str, (
+        f"El healthcheck de src debe conectarse por TCP, encontrado: {test_str}"
+    )
 
 
 @pytest.mark.integracion
