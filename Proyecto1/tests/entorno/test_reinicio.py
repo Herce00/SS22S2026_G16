@@ -62,3 +62,19 @@ def test_reinicio_limpio(proyecto1_dir, env_config):
     assert res_sch.returncode == 0
     schemas = set(res_sch.stdout.strip().splitlines())
     assert {"raw", "staging", "marts"}.issubset(schemas), f"Schemas faltantes: {schemas}"
+
+    # 7. Exigir que tras el arranque y dos ciclos del scheduler, sgfood_elt existe, está en pausa y no tiene ejecuciones
+    time.sleep(10)
+    res_dags = run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "dags", "list", "-o", "json", cwd=proyecto1_dir)
+    assert res_dags.returncode == 0
+    lineas_dags = [l.strip() for l in res_dags.stdout.splitlines() if (l.strip().startswith("[") and l.strip().endswith("]")) or (l.strip().startswith("{") and l.strip().endswith("}"))]
+    dags_list = json.loads(lineas_dags[-1]) if lineas_dags else []
+    dag_ids = {d.get("dag_id"): d.get("is_paused") for d in dags_list}
+    assert "sgfood_elt" in dag_ids, f"DAG sgfood_elt no encontrado tras reinicio: {dag_ids}"
+    assert str(dag_ids["sgfood_elt"]).lower() == "true", f"sgfood_elt debe crearse en pausa (is_paused=True), obtenido: {dag_ids['sgfood_elt']}"
+
+    res_runs = run_docker_compose("exec", "-T", "airflow-scheduler", "airflow", "dags", "list-runs", "sgfood_elt", "-o", "json", cwd=proyecto1_dir)
+    assert res_runs.returncode == 0
+    lineas_runs = [l.strip() for l in res_runs.stdout.splitlines() if (l.strip().startswith("[") and l.strip().endswith("]")) or (l.strip().startswith("{") and l.strip().endswith("}"))]
+    runs_list = json.loads(lineas_runs[-1]) if lineas_runs else []
+    assert len(runs_list) == 0, f"sgfood_elt no debe tener ejecuciones tras arranque limpio: {runs_list}"

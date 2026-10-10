@@ -134,11 +134,11 @@ Las rutas son relativas a `Proyecto1/` y los comandos se ejecutan desde esa carp
 
 ## T9 — Arranque desde cero y evidencia
 
-- [ ] Ejecutar `docker compose down -v` y `docker compose up -d`.
-- [ ] **Rojo y verde:** tras el arranque y dos ciclos del scheduler, `sgfood_elt` existe, está en pausa y no tiene ejecuciones.
-- [ ] Ejecutar la suite completa: `pytest tests/entorno tests/contrato tests/ingesta tests/dag`, y la prueba lenta de forma explícita.
-- [ ] Ejecutar el DAG una vez con el proyecto de prueba `dbt_ok` y guardar en `evidencia/`, como `.txt`: tareas y dependencias del DAG, estado de cada tarea de la ejecución y registros de `dbt_run`, `dbt_test` y `validar_marts`.
-- [ ] Confirmar con `git status` que los archivos de evidencia no quedaron ignorados.
+- [x] Ejecutar `docker compose down -v` y `docker compose up -d`.
+- [x] **Rojo y verde:** tras el arranque y dos ciclos del scheduler, `sgfood_elt` existe, está en pausa y no tiene ejecuciones.
+- [x] Ejecutar la suite completa: `pytest tests/entorno tests/contrato tests/ingesta tests/dag`, y la prueba lenta de forma explícita.
+- [x] Ejecutar el DAG una vez con el proyecto de prueba `dbt_ok` y guardar en `evidencia/`, como `.txt`: tareas y dependencias del DAG, estado de cada tarea de la ejecución y registros de `dbt_run`, `dbt_test` y `validar_marts`.
+- [x] Confirmar con `git status` que los archivos de evidencia no quedaron ignorados.
 
 **Verificación:** todas las pruebas pasan en un entorno limpio; la evidencia está versionada.
 **Commit:** `feat(p1-dag): verify clean start and add run evidence`
