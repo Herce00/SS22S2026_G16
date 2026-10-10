@@ -43,13 +43,13 @@ Las rutas son relativas a `Proyecto1/` y los comandos se ejecutan desde esa carp
 
 ## T2 — Validación de conteos
 
-- [ ] **Rojo (unitaria):** `tests/dag/test_validacion.py`:
+- [x] **Rojo (unitaria):** `tests/dag/test_validacion.py`:
   - `validar_conteos` con conteos que coinciden devuelve una entrada por fuente.
   - Con una tabla que no coincide lanza `ValidacionFallida` nombrando la tabla y ambas cantidades.
   - Con dos tablas que no coinciden, el mensaje nombra las dos.
-- [ ] **Rojo (integración):** tras una carga completa, `validar_conteos` ejecutada en el contenedor termina bien y registra 12 tablas y el total de 8864; tras borrar una fila de `raw.promociones`, falla nombrando `promociones`.
-- [ ] **Verde:** crear `python/sgfood_ingesta/validacion.py` con `contar_fuentes_y_raw` y `validar_conteos`; agregar `ValidacionFallida` a `errores.py`.
-- [ ] La prueba de integración restaura `raw.promociones` al terminar.
+- [x] **Rojo (integración):** tras una carga completa, `validar_conteos` ejecutada en el contenedor termina bien y registra 12 tablas y el total de 8864; tras borrar una fila de `raw.promociones`, falla nombrando `promociones`.
+- [x] **Verde:** crear `python/sgfood_ingesta/validacion.py` con `contar_fuentes_y_raw` y `validar_conteos`; agregar `ValidacionFallida` a `errores.py`.
+- [x] La prueba de integración restaura `raw.promociones` al terminar.
 
 **Verificación:** `pytest tests/dag -k "validacion and conteos"`.
 **Commit:** `feat(p1-dag): validate row counts between sources and raw`

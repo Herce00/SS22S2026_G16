@@ -32,3 +32,9 @@ class FilaInvalida(ErrorIngesta):
 class ConteoInconsistente(ErrorIngesta):
     """La cantidad de filas cargadas en raw no coincide con las filas leídas de la fuente."""
     pass
+
+
+class ValidacionFallida(ErrorIngesta):
+    """Una validación de calidad de datos, conteos o integridad referencial falló."""
+    pass
+

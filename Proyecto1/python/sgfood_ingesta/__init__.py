@@ -8,6 +8,13 @@ from sgfood_ingesta.errores import (
     EncabezadoInvalido,
     FilaInvalida,
     ConteoInconsistente,
+    ValidacionFallida,
+)
+from sgfood_ingesta.validacion import (
+    ConteoTabla,
+    ResultadoValidacionSql,
+    contar_fuentes_y_raw,
+    validar_conteos,
 )
 
 __all__ = [
@@ -22,4 +29,10 @@ __all__ = [
     "EncabezadoInvalido",
     "FilaInvalida",
     "ConteoInconsistente",
+    "ValidacionFallida",
+    "ConteoTabla",
+    "ResultadoValidacionSql",
+    "contar_fuentes_y_raw",
+    "validar_conteos",
 ]
+
