@@ -433,6 +433,26 @@ Los archivos están en [evidencia/](evidencia/).
 | `dag_estados_tareas.txt` | Estado de cada tarea en una ejecución completa |
 | `dag_log_dbt_run.txt`, `dag_log_dbt_test.txt`, `dag_log_validar_marts.txt` | Registros de las tareas de dbt y de validación |
 | `dbt_run_ejecucion_real.txt` | Ejecución de dbt sobre el esqueleto del proyecto |
+| `dag_grafo.png` | Grafo del DAG `sgfood_elt` en la interfaz de Airflow |
+| `dag_ejecucion_exitosa.png` | Ejecución completa con las 17 tareas en estado exitoso |
+| `dag_fallo_controlado.png` | Ejecución detenida por una validación final que no se cumple |
 
-> **Pendiente:** capturas de la interfaz de Airflow con el grafo del DAG y una ejecución exitosa, y la evidencia del Rol B.
+### Grafo del DAG
 
+El grupo `carga_raw` contiene las 12 tareas de carga, una por fuente. Después se ejecutan, en orden, `validar_carga_raw`, `dbt_deps`, `dbt_run`, `dbt_test` y `validar_marts`.
+
+![Grafo del DAG sgfood_elt con el grupo carga_raw expandido](evidencia/dag_grafo.png)
+
+### Ejecución exitosa
+
+Ejecución manual del 2026-10-10 con los parámetros predeterminados: las 17 instancias de tarea terminaron en estado exitoso en 16 segundos.
+
+![Ejecución del DAG sgfood_elt con las 17 tareas en estado exitoso](evidencia/dag_ejecucion_exitosa.png)
+
+### Control de errores
+
+Ejecución de prueba con una carpeta de validaciones cuyas consultas devuelven filas. La carga y las tareas de dbt terminan bien, `validar_marts` falla y la ejecución queda marcada como fallida. El registro nombra cada archivo de validación incumplido y muestra las filas devueltas.
+
+![Tarea validar_marts fallida con el registro de la validación incumplida](evidencia/dag_fallo_controlado.png)
+
+> **Pendiente — Rol B:** evidencia de los modelos dbt, sus pruebas y las consultas analíticas.
