@@ -1,7 +1,8 @@
-"""DAG de orquestación técnica ELT para SG-Food."""
+import os
 from datetime import datetime, timedelta, timezone
 
-from airflow.sdk import DAG, TaskGroup, task
+from airflow.providers.standard.operators.bash import BashOperator
+from airflow.sdk import DAG, Param, TaskGroup, task
 
 from sgfood_ingesta.config import listar_fuentes
 from sgfood_ingesta.ingesta import cargar_fuente
@@ -30,6 +31,23 @@ with DAG(
     is_paused_upon_creation=True,
     tags=["sgfood", "elt"],
     default_args=DEFAULT_ARGS,
+    params={
+        "dbt_project_dir": Param(
+            default=os.environ.get("DBT_PROJECT_DIR", "/opt/airflow/dbt_project"),
+            type="string",
+            description="Ruta del proyecto dbt a ejecutar",
+        ),
+        "dbt_profiles_dir": Param(
+            default=os.environ.get("DBT_PROFILES_DIR", "/opt/airflow/dbt_project"),
+            type="string",
+            description="Ruta de la carpeta profiles.yml de dbt",
+        ),
+        "validaciones_dir": Param(
+            default="/opt/airflow/sql/validaciones/dag",
+            type="string",
+            description="Ruta de la carpeta de validaciones SQL finales",
+        ),
+    },
 ) as dag:
 
     # 1. Grupo de tareas dinámicas de ingesta a raw
@@ -63,5 +81,47 @@ with DAG(
         validar_conteos()
 
     t_validar_carga_raw = validar_carga_raw()
-    carga_raw >> t_validar_carga_raw
+
+    # 3. Tareas dbt (deps, run, test)
+    dbt_env = {
+        "DBT_PROJECT_DIR": "{{ params.dbt_project_dir }}",
+        "DBT_PROFILES_DIR": "{{ params.dbt_profiles_dir }}",
+    }
+
+    dbt_deps = BashOperator(
+        task_id="dbt_deps",
+        bash_command=(
+            'if [ -f "$DBT_PROJECT_DIR/packages.yml" ]; then '
+            '/opt/dbt-venv/bin/dbt deps --project-dir "$DBT_PROJECT_DIR" --profiles-dir "$DBT_PROFILES_DIR"; '
+            'else echo "packages.yml no existe; omitiendo dbt deps"; fi'
+        ),
+        env=dbt_env,
+        append_env=True,
+        retries=2,
+        retry_delay=timedelta(minutes=1),
+        execution_timeout=timedelta(minutes=10),
+    )
+
+    dbt_run = BashOperator(
+        task_id="dbt_run",
+        bash_command='/opt/dbt-venv/bin/dbt run --project-dir "$DBT_PROJECT_DIR" --profiles-dir "$DBT_PROFILES_DIR"',
+        env=dbt_env,
+        append_env=True,
+        retries=1,
+        retry_delay=timedelta(minutes=1),
+        execution_timeout=timedelta(minutes=20),
+    )
+
+    dbt_test = BashOperator(
+        task_id="dbt_test",
+        bash_command='/opt/dbt-venv/bin/dbt test --project-dir "$DBT_PROJECT_DIR" --profiles-dir "$DBT_PROFILES_DIR"',
+        env=dbt_env,
+        append_env=True,
+        retries=0,
+        execution_timeout=timedelta(minutes=20),
+    )
+
+    # Dependencias del pipeline ELT
+    carga_raw >> t_validar_carga_raw >> dbt_deps >> dbt_run >> dbt_test
+
 

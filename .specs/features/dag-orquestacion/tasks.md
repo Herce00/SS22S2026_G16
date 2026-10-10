@@ -96,13 +96,13 @@ Las rutas son relativas a `Proyecto1/` y los comandos se ejecutan desde esa carp
 
 ## T6 — Tareas de dbt
 
-- [ ] **Rojo (estructura):** existen `dbt_deps`, `dbt_run` y `dbt_test`, en ese orden después de `validar_carga_raw`; usan `/opt/dbt-venv/bin/dbt`; `dbt_test` no tiene reintentos; ningún comando contiene `||` ni `; true`.
-- [ ] **Rojo (ejecución):** crear `tests/dag/fixtures/dbt_ok/` y disparar el DAG con `dbt_project_dir` y `dbt_profiles_dir` apuntando a su copia en el contenedor:
+- [x] **Rojo (estructura):** existen `dbt_deps`, `dbt_run` y `dbt_test`, en ese orden después de `validar_carga_raw`; usan `/opt/dbt-venv/bin/dbt`; `dbt_test` no tiene reintentos; ningún comando contiene `||` ni `; true`.
+- [x] **Rojo (ejecución):** crear `tests/dag/fixtures/dbt_ok/` y disparar el DAG con `dbt_project_dir` y `dbt_profiles_dir` apuntando a su copia en el contenedor:
   - `dbt_deps`, `dbt_run` y `dbt_test` terminan en `success`.
   - El modelo del proyecto de prueba existe en el schema `dag_test` con 6 filas.
   - El registro de `dbt_run` contiene la salida de dbt.
-- [ ] **Verde:** agregar las tareas de dbt y los parámetros de ejecución al DAG.
-- [ ] La prueba elimina el schema `dag_test` al terminar.
+- [x] **Verde:** agregar las tareas de dbt y los parámetros de ejecución al DAG.
+- [x] La prueba elimina el schema `dag_test` al terminar.
 
 **Verificación:** `pytest tests/dag -k "ejecucion"`.
 **Commit:** `feat(p1-dag): run dbt deps, run and test from the dag`

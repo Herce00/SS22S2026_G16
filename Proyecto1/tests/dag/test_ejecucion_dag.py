@@ -25,9 +25,20 @@ def test_ejecucion_tareas_carga_raw(proyecto1_dir):
         )
         assert res_unpause.returncode == 0, f"Error al despausar {dag_id}: {res_unpause.stderr}"
 
-        # 2. Disparar el DAG
+        # 2. Preparar fixture dbt_ok en el contenedor scheduler
+        import subprocess
+        fixture_dbt = os.path.join(proyecto1_dir, "tests", "dag", "fixtures", "dbt_ok")
+        run_docker_compose("exec", "-T", "airflow-scheduler", "mkdir", "-p", "/tmp/fixtures", cwd=proyecto1_dir)
+        subprocess.run(["docker", "cp", fixture_dbt, "sgfood_airflow_scheduler:/tmp/fixtures/dbt_ok"], check=True)
+        run_docker_compose("exec", "-T", "--user", "0", "airflow-scheduler", "chown", "-R", "airflow:root", "/tmp/fixtures", cwd=proyecto1_dir)
+
+        # 3. Disparar el DAG con parámetros hacia dbt_ok
+        conf_str = json.dumps({
+            "dbt_project_dir": "/tmp/fixtures/dbt_ok",
+            "dbt_profiles_dir": "/tmp/fixtures/dbt_ok",
+        })
         res_trig = run_docker_compose(
-            "exec", "-T", "airflow-scheduler", "airflow", "dags", "trigger", dag_id, "-o", "json",
+            "exec", "-T", "airflow-scheduler", "airflow", "dags", "trigger", dag_id, "--conf", conf_str, "-o", "json",
             cwd=proyecto1_dir
         )
         assert res_trig.returncode == 0, f"Error al disparar {dag_id}: {res_trig.stderr}"
@@ -44,7 +55,7 @@ def test_ejecucion_tareas_carga_raw(proyecto1_dir):
 
         assert run_id, f"No se pudo obtener el run_id del trigger:\n{res_trig.stdout}"
 
-        # 3. Esperar que la ejecución termine (máx 120s)
+        # 4. Esperar que la ejecución termine (máx 120s)
         estado_final = None
         start_time = time.time()
         while time.time() - start_time < 120:
@@ -72,7 +83,7 @@ def test_ejecucion_tareas_carga_raw(proyecto1_dir):
 
         assert estado_final == "success", f"La ejecución del DAG terminó con estado '{estado_final}', se esperaba 'success'"
 
-        # 4. Verificar que cada una de las 12 tareas de carga terminó en success
+        # 5. Verificar que cada una de las 12 tareas de carga terminó en success
         res_tis = run_docker_compose(
             "exec", "-T", "airflow-scheduler", "airflow", "tasks", "states-for-dag-run", dag_id, run_id, "-o", "json",
             cwd=proyecto1_dir
@@ -95,24 +106,43 @@ def test_ejecucion_tareas_carga_raw(proyecto1_dir):
             f"validar_carga_raw terminó con estado '{estados_por_tarea['validar_carga_raw']}', se esperaba 'success'"
         )
 
-        # Buscar el archivo de log de validar_carga_raw para este run
+        # T6: Verificar tareas de dbt
+        for dbt_task in ["dbt_deps", "dbt_run", "dbt_test"]:
+            assert dbt_task in estados_por_tarea, f"Tarea {dbt_task} no encontrada en task instances"
+            assert estados_por_tarea[dbt_task] == "success", (
+                f"Tarea {dbt_task} terminó con estado '{estados_por_tarea[dbt_task]}', se esperaba 'success'"
+            )
+
+        # Buscar archivos de log de validar_carga_raw y dbt_run para este run
         logs_base = os.path.join(proyecto1_dir, "airflow", "logs", "dag_id=sgfood_elt")
         log_encontrado = False
         contenido_log = ""
+        dbt_log_encontrado = False
+        contenido_dbt_log = ""
         for root, dirs, files in os.walk(logs_base):
             if "task_id=validar_carga_raw" in root:
                 for file in files:
                     if file.endswith(".log"):
-                        with open(os.path.join(root, file), "r", encoding="utf-8") as lf:
+                        with open(os.path.join(root, file), "r", encoding="utf-8", errors="ignore") as lf:
                             contenido_log += lf.read()
                         log_encontrado = True
+            if "task_id=dbt_run" in root:
+                for file in files:
+                    if file.endswith(".log"):
+                        with open(os.path.join(root, file), "r", encoding="utf-8", errors="ignore") as lf:
+                            contenido_dbt_log += lf.read()
+                        dbt_log_encontrado = True
 
         assert log_encontrado, f"No se encontró archivo de log para validar_carga_raw en {logs_base}"
         assert "8864" in contenido_log, f"El log de validar_carga_raw no contiene el total 8864:\n{contenido_log}"
         assert "12" in contenido_log, f"El log de validar_carga_raw no contiene el conteo de 12 tablas:\n{contenido_log}"
 
+        assert dbt_log_encontrado, f"No se encontró archivo de log para dbt_run en {logs_base}"
+        assert ("Running with dbt" in contenido_dbt_log or "Completed successfully" in contenido_dbt_log), (
+            f"El log de dbt_run no contiene la salida esperada de dbt:\n{contenido_dbt_log}"
+        )
 
-        # 5. Verificar filas en raw (8864) y único _loaded_at
+        # 6. Verificar filas en raw (8864) y único _loaded_at
         script_dw = (
             "import psycopg\n"
             "from sgfood_ingesta.config import listar_fuentes\n"
@@ -139,8 +169,22 @@ def test_ejecucion_tareas_carga_raw(proyecto1_dir):
         assert "TOTAL=8864" in res_dw.stdout, f"Se esperaban 8864 filas en raw:\n{res_dw.stdout}"
         assert "LOADED_COUNT=1" in res_dw.stdout, f"Todas las tablas deben compartir un único _loaded_at:\n{res_dw.stdout}"
 
+        # 7. T6: Verificar que el modelo del proyecto de prueba existe en schema dag_test con 6 filas
+        res_dbt_check = run_docker_compose(
+            "exec", "-T", "dw", "psql", "-U", "dw_user", "-d", "sgfood_dw", "-tAc",
+            "SELECT count(*) FROM dag_test.test_sucursal;",
+            cwd=proyecto1_dir
+        )
+        assert res_dbt_check.returncode == 0, f"Error al consultar dag_test en DW:\n{res_dbt_check.stderr}"
+        assert res_dbt_check.stdout.strip() == "6", f"Se esperaban 6 filas en dag_test.test_sucursal:\n{res_dbt_check.stdout}"
+
     finally:
-        # Limpieza: pausar el DAG para dejarlo en su estado inicial
+        # Limpieza: eliminar schema de prueba en DW y pausar el DAG
+        run_docker_compose(
+            "exec", "-T", "dw", "psql", "-U", "dw_user", "-d", "sgfood_dw", "-c",
+            "DROP SCHEMA IF EXISTS dag_test CASCADE;",
+            cwd=proyecto1_dir
+        )
         run_docker_compose(
             "exec", "-T", "airflow-scheduler", "airflow", "dags", "pause", "-y", dag_id,
             cwd=proyecto1_dir
