@@ -1,0 +1,76 @@
+version: 2
+
+models:
+  - name: int_ventas_linea
+    description: "Líneas de venta enriquecidas con los atributos de la cabecera de venta."
+    columns:
+      - name: id_detalle
+        description: "Identificador de la línea de venta."
+        tests:
+          - unique
+          - not_null
+      - name: id_venta
+        tests:
+          - not_null
+      - name: id_producto
+        tests:
+          - not_null
+      - name: fecha
+        tests:
+          - not_null
+
+  - name: int_inventario_snapshot
+    description: "Snapshots de inventario con indicadores de faltante y sobrante."
+    columns:
+      - name: fecha_corte
+        tests:
+          - not_null
+      - name: id_sucursal
+        tests:
+          - not_null
+      - name: id_producto
+        tests:
+          - not_null
+      - name: lote
+        tests:
+          - not_null
+
+  - name: int_devoluciones
+    description: "Devoluciones tipadas preparadas para el mart de devoluciones."
+    columns:
+      - name: id_devolucion
+        tests:
+          - unique
+          - not_null
+      - name: id_venta
+        tests:
+          - not_null
+      - name: id_producto
+        tests:
+          - not_null
+
+  - name: int_metas_ventas
+    description: "Metas mensuales con el periodo convertido al primer día del mes."
+    columns:
+      - name: periodo_fecha
+        tests:
+          - not_null
+      - name: periodo
+        tests:
+          - not_null
+      - name: id_sucursal
+        tests:
+          - not_null
+
+  - name: int_precios_proveedor
+    description: "Precios de proveedores preparados para el mart correspondiente."
+    columns:
+      - name: id_proveedor
+        tests:
+          - not_null
+      - name: id_producto
+        tests:
+          - not_null
+      - name: fecha_vigencia
+        tests:
+          - not_null

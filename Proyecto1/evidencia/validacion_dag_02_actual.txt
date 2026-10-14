@@ -1,0 +1,4 @@
+ validacion | venta_linea_key 
+------------+-----------------
+(0 rows)
+
