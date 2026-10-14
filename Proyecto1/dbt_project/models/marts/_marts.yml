@@ -1,0 +1,166 @@
+version: 2
+
+models:
+  - name: dim_fecha
+    description: "Dimensión calendario compartida por los procesos analíticos."
+    columns:
+      - name: fecha_key
+        tests: [unique, not_null]
+      - name: fecha
+        tests: [unique, not_null]
+
+  - name: dim_sucursal
+    description: "Dimensión de sucursales."
+    columns:
+      - name: sucursal_key
+        tests: [unique, not_null]
+      - name: id_sucursal
+        tests: [unique, not_null]
+
+  - name: dim_cliente
+    description: "Dimensión de clientes."
+    columns:
+      - name: cliente_key
+        tests: [unique, not_null]
+      - name: id_cliente
+        tests: [unique, not_null]
+
+  - name: dim_categoria
+    description: "Dimensión de categorías."
+    columns:
+      - name: categoria_key
+        tests: [unique, not_null]
+      - name: id_categoria
+        tests: [unique, not_null]
+
+  - name: dim_marca
+    description: "Dimensión de marcas."
+    columns:
+      - name: marca_key
+        tests: [unique, not_null]
+      - name: id_marca
+        tests: [unique, not_null]
+
+  - name: dim_producto
+    description: "Dimensión de productos enriquecida con categoría y marca."
+    columns:
+      - name: producto_key
+        tests: [unique, not_null]
+      - name: id_producto
+        tests: [unique, not_null]
+      - name: categoria_key
+        tests:
+          - relationships:
+              to: ref('dim_categoria')
+              field: categoria_key
+      - name: marca_key
+        tests:
+          - relationships:
+              to: ref('dim_marca')
+              field: marca_key
+
+  - name: dim_promocion
+    description: "Dimensión de campañas promocionales."
+    columns:
+      - name: promocion_key
+        tests: [unique, not_null]
+      - name: id_promocion
+        tests: [unique, not_null]
+
+  - name: fct_ventas_linea
+    description: "Hecho de ventas al nivel de línea de detalle."
+    columns:
+      - name: venta_linea_key
+        tests: [unique, not_null]
+      - name: id_detalle
+        tests: [unique, not_null]
+      - name: fecha_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_fecha')
+              field: fecha_key
+      - name: cliente_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_cliente')
+              field: cliente_key
+      - name: sucursal_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_sucursal')
+              field: sucursal_key
+      - name: producto_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_producto')
+              field: producto_key
+
+  - name: fct_inventario_snapshot
+    description: "Hecho de inventario al nivel de fecha, sucursal, producto y lote."
+    columns:
+      - name: inventario_snapshot_key
+        tests: [unique, not_null]
+      - name: fecha_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_fecha')
+              field: fecha_key
+      - name: sucursal_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_sucursal')
+              field: sucursal_key
+      - name: producto_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_producto')
+              field: producto_key
+
+  - name: fct_devoluciones
+    description: "Hecho de devoluciones al nivel de devolución registrada."
+    columns:
+      - name: devolucion_key
+        tests: [unique, not_null]
+      - name: producto_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_producto')
+              field: producto_key
+
+  - name: fct_metas_ventas
+    description: "Hecho de metas mensuales por sucursal."
+    columns:
+      - name: meta_key
+        tests: [unique, not_null]
+      - name: periodo_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_fecha')
+              field: fecha_key
+      - name: sucursal_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_sucursal')
+              field: sucursal_key
+
+  - name: fct_precios_proveedor
+    description: "Hecho de precios por proveedor, producto y vigencia."
+    columns:
+      - name: precio_proveedor_key
+        tests: [unique, not_null]
+      - name: producto_key
+        tests:
+          - not_null
+          - relationships:
+              to: ref('dim_producto')
+              field: producto_key

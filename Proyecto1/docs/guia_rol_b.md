@@ -36,44 +36,60 @@ El Rol A ha completado la infraestructura de ingesta y orquestación técnica de
 ## 2. Arranque en 5 pasos
 
 ### Paso 1: Crear tu rama desde `main`
+
 El trabajo del Rol A llega a `main` por pull request. Crea tu rama **después** de ese merge; si la creas antes, no tendrás el entorno, los datos ni el esqueleto.
+
 ```bash
 git checkout main
 git pull
 git checkout -b feat/dbt-modelado
 ```
+
 El nombre `feat/dbt-modelado` es el acordado en el steering. Cada integrante trabaja solo en su rama y los cambios entran a `main` por pull request revisado por el otro.
 
 ### Paso 2: Configurar variables de entorno
+
 Copia la plantilla `.env.example` a `.env` en la raíz de `Proyecto1/`:
+
 ```bash
 cp Proyecto1/.env.example Proyecto1/.env
 ```
-*(Verifica que las credenciales coincidan con las requeridas para desarrollo).*
+
+_(Verifica que las credenciales coincidan con las requeridas para desarrollo)._
 
 ### Paso 3: Levantar el entorno Docker
+
 Desde la carpeta `Proyecto1/`:
+
 ```bash
 docker compose up -d
 ```
+
 Verifica que todos los servicios estén saludables (`healthy`):
+
 ```bash
 docker compose ps
 ```
 
 ### Paso 4: Ejecutar el pipeline de ingesta inicial
+
 Puedes disparar la carga completa a `raw` desde la línea de comandos o desde Airflow:
+
 ```bash
 docker compose exec airflow-scheduler python -m sgfood_ingesta
 ```
+
 O disparando el DAG en Airflow:
+
 ```bash
 docker compose exec airflow-scheduler airflow dags unpause -y sgfood_elt
 docker compose exec airflow-scheduler airflow dags trigger sgfood_elt
 ```
 
 ### Paso 5: Probar dbt sobre el esqueleto
+
 Verifica la conexión del proyecto dbt:
+
 ```bash
 docker compose exec airflow-scheduler /opt/dbt-venv/bin/dbt debug --project-dir /opt/airflow/dbt_project --profiles-dir /opt/airflow/dbt_project
 ```
@@ -83,6 +99,7 @@ docker compose exec airflow-scheduler /opt/dbt-venv/bin/dbt debug --project-dir 
 ## 3. Cómo ejecutar dbt
 
 ### Opción A: Dentro del contenedor de Airflow (Recomendado)
+
 No requiere instalar Python ni dbt en tu máquina host. La carpeta `Proyecto1/dbt_project/` está montada como volumen en `/opt/airflow/dbt_project`:
 
 - **Compilar:**
@@ -99,6 +116,7 @@ No requiere instalar Python ni dbt en tu máquina host. La carpeta `Proyecto1/db
   ```
 
 ### Opción B: Desde el equipo local (Host)
+
 Si prefieres usar la CLI de dbt directamente en tu terminal:
 
 1. Crea un virtualenv local e instala `dbt-postgres`:
@@ -168,16 +186,16 @@ Además de las pruebas de dbt (`dbt test`), el DAG cuenta con una tarea final (`
 
 ## 6. Matriz de responsabilidades y dependencias
 
-| Componente / Ruta | Rol Responsable | Reglas de Colaboración |
-|-------------------|-----------------|------------------------|
-| `Proyecto1/data/` | Rol A | Archivos de datos inmutables byte a byte. No editar ni renombrar. |
-| `Proyecto1/python/` | Rol A | Código de ingesta y conexiones. Rol B lo consume como servicio. |
-| `Proyecto1/airflow/` | Rol A | Definición de DAGs y orquestación. Parámetros dinámicos vía `params`. |
-| `Proyecto1/dbt_project/` | **Rol B** | Propiedad exclusiva de B tras la entrega del esqueleto. |
-| `Proyecto1/sql/ddl/` | Rol A | DDL de schemas y tablas de `raw`. Las tablas de `staging` y `marts` las crea dbt, no este DDL. |
-| `Proyecto1/sql/validaciones/` | **Rol B** | Consultas analíticas y de validación. La subcarpeta `dag/` es la que ejecuta el DAG. |
-| `Proyecto1/docs/contrato_raw.md` | Compartido | Interfaz entre los dos roles. Se cambia solo con acuerdo. |
-| `Proyecto1/tests/` | Rol A | Pruebas de entorno, contrato, ingesta y DAG. No dependen del contenido de `dbt_project/`. |
+| Componente / Ruta                | Rol Responsable | Reglas de Colaboración                                                                         |
+| -------------------------------- | --------------- | ---------------------------------------------------------------------------------------------- |
+| `Proyecto1/data/`                | Rol A           | Archivos de datos inmutables byte a byte. No editar ni renombrar.                              |
+| `Proyecto1/python/`              | Rol A           | Código de ingesta y conexiones. Rol B lo consume como servicio.                                |
+| `Proyecto1/airflow/`             | Rol A           | Definición de DAGs y orquestación. Parámetros dinámicos vía `params`.                          |
+| `Proyecto1/dbt_project/`         | **Rol B**       | Propiedad exclusiva de B tras la entrega del esqueleto.                                        |
+| `Proyecto1/sql/ddl/`             | Rol A           | DDL de schemas y tablas de `raw`. Las tablas de `staging` y `marts` las crea dbt, no este DDL. |
+| `Proyecto1/sql/validaciones/`    | **Rol B**       | Consultas analíticas y de validación. La subcarpeta `dag/` es la que ejecuta el DAG.           |
+| `Proyecto1/docs/contrato_raw.md` | Compartido      | Interfaz entre los dos roles. Se cambia solo con acuerdo.                                      |
+| `Proyecto1/tests/`               | Rol A           | Pruebas de entorno, contrato, ingesta y DAG. No dependen del contenido de `dbt_project/`.      |
 
 ### Qué puedes cambiar sin avisar
 
@@ -202,22 +220,22 @@ Lo que sigue es el alcance del Rol B según el enunciado y la rúbrica. El esque
 
 ### Obligatorio
 
-- [ ] **Diseñar el modelo dimensional.** Definir hechos, dimensiones y granularidad. Los datos dan para, al menos, ventas (al nivel de línea de detalle) e inventario (foto mensual), con dimensiones como producto, marca, categoría, cliente, sucursal y tiempo. Devoluciones, metas, promociones y precios de proveedores pueden ser hechos o dimensiones adicionales.
-- [ ] **Modelos `staging`** para las 11 tablas restantes de `raw`: renombrar, convertir tipos y limpiar. Sin joins.
-- [ ] **Modelos `intermediate`** con los joins y la lógica reutilizable, y decidir en qué schema viven.
-- [ ] **Modelos `marts`**: dimensiones y hechos, con sus claves y relaciones.
-- [ ] **Materializaciones** coherentes por capa, con al menos una `incremental` donde tenga sentido.
-- [ ] **Pruebas dbt**: `unique` y `not_null` en cada clave, `relationships` de hechos a dimensiones, `accepted_values` en columnas categóricas y al menos una prueba personalizada.
-- [ ] **Documentación dbt**: descripciones en YAML y `dbt docs generate` sin errores.
-- [ ] **Consultas analíticas y de validación** en `sql/validaciones/`: conteos, integridad referencial y resultados de negocio. Las que deban detener el pipeline van en `sql/validaciones/dag/`.
-- [ ] **Secciones del README** que hoy están marcadas como pendientes: modelo del Data Warehouse, estructura del proyecto dbt y justificación de diseño.
-- [ ] **Evidencia** de tu parte en `Proyecto1/evidencia/`: resultado de `dbt run`, `dbt test` y de las consultas analíticas.
+- [x] **Diseñar el modelo dimensional.** Definir hechos, dimensiones y granularidad. Los datos dan para, al menos, ventas (al nivel de línea de detalle) e inventario (foto mensual), con dimensiones como producto, marca, categoría, cliente, sucursal y tiempo. Devoluciones, metas, promociones y precios de proveedores pueden ser hechos o dimensiones adicionales.
+- [x] **Modelos `staging`** para las 11 tablas restantes de `raw`: renombrar, convertir tipos y limpiar. Sin joins.
+- [x] **Modelos `intermediate`** con los joins y la lógica reutilizable, y decidir en qué schema viven.
+- [x] **Modelos `marts`**: dimensiones y hechos, con sus claves y relaciones.
+- [x] **Materializaciones** coherentes por capa, con al menos una `incremental` donde tenga sentido.
+- [x] **Pruebas dbt**: `unique` y `not_null` en cada clave, `relationships` de hechos a dimensiones, `accepted_values` en columnas categóricas y al menos una prueba personalizada.
+- [x] **Documentación dbt**: descripciones en YAML y `dbt docs generate` sin errores.
+- [x] **Consultas analíticas y de validación** en `sql/validaciones/`: conteos, integridad referencial y resultados de negocio. Las que deban detener el pipeline van en `sql/validaciones/dag/`.
+- [x] **Secciones del README** que hoy están marcadas como pendientes: modelo del Data Warehouse, estructura del proyecto dbt y justificación de diseño.
+- [x] **Evidencia** de tu parte en `Proyecto1/evidencia/`: actualizar los resultados de `dbt run`, `dbt test` y de las consultas analíticas para que correspondan a los modelos actuales.
 
 ### Decisiones abiertas que son tuyas
 
-- [ ] En qué schema se materializa `intermediate`.
-- [ ] Si se usan los casos de `casos_calidad_opcionales.csv` y cómo. No se cargan en la corrida principal (decisión D8).
-- [ ] Conservar, modificar o eliminar el modelo de ejemplo `stg_oltp__sucursal`.
+- [x] En qué schema se materializa `intermediate`.
+- [x] Si se usan los casos de `casos_calidad_opcionales.csv` y cómo. No se cargan en la corrida principal (decisión D8).
+- [x] Conservar, modificar o eliminar el modelo de ejemplo `stg_oltp__sucursal`.
 
 ### Opcional
 

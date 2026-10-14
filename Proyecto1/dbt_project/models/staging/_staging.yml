@@ -9,3 +9,231 @@ models:
         tests:
           - unique
           - not_null
+
+  - name: stg_oltp__categoria
+    description: "Categorías tipadas y limpiadas desde raw"
+    columns:
+      - name: id_categoria
+        tests:
+          - unique
+          - not_null
+      - name: nombre
+        tests:
+          - not_null
+
+  - name: stg_oltp__marca
+    description: "Marcas tipadas y limpiadas desde raw"
+    columns:
+      - name: id_marca
+        tests:
+          - unique
+          - not_null
+      - name: nombre
+        tests:
+          - not_null
+
+  - name: stg_oltp__producto
+    description: "Productos tipados y limpiados desde raw"
+    columns:
+      - name: id_producto
+        tests:
+          - unique
+          - not_null
+      - name: sku
+        tests:
+          - unique
+          - not_null
+      - name: nombre
+        tests:
+          - not_null
+      - name: id_categoria
+        tests:
+          - not_null
+      - name: id_marca
+        tests:
+          - not_null
+      - name: activo
+        tests:
+          - accepted_values:
+              values: [true, false]
+
+  - name: stg_oltp__cliente
+    description: "Clientes tipados y limpiados desde raw"
+    columns:
+      - name: id_cliente
+        tests:
+          - unique
+          - not_null
+      - name: nit
+        tests:
+          - not_null
+      - name: fecha_alta
+        tests:
+          - not_null
+
+  - name: stg_oltp__venta
+    description: "Cabeceras de venta tipadas y limpiadas desde raw"
+    columns:
+      - name: id_venta
+        tests:
+          - unique
+          - not_null
+      - name: fecha
+        tests:
+          - not_null
+      - name: id_cliente
+        tests:
+          - not_null
+      - name: id_sucursal
+        tests:
+          - not_null
+      - name: canal
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Tienda', 'Televenta', 'Mayorista', 'Web']
+      - name: metodo_pago
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['Efectivo', 'Tarjeta', 'Transferencia', 'Crédito']
+      - name: estado
+        tests:
+          - not_null
+          - accepted_values:
+              values: ['COMPLETADA', 'PENDIENTE', 'ANULADA']
+
+  - name: stg_oltp__venta_detalle
+    description: "Líneas de venta tipadas y limpiadas desde raw"
+    columns:
+      - name: id_detalle
+        tests:
+          - unique
+          - not_null
+      - name: id_venta
+        tests:
+          - not_null
+      - name: id_producto
+        tests:
+          - not_null
+      - name: cantidad
+        tests:
+          - not_null
+      - name: precio_unitario
+        tests:
+          - not_null
+      - name: subtotal
+        tests:
+          - not_null
+
+  - name: stg_archivos__inventario_bodega
+    description: "Snapshots de inventario tipados y limpiados desde raw"
+    columns:
+      - name: fecha_corte
+        tests:
+          - not_null
+      - name: id_sucursal
+        tests:
+          - not_null
+      - name: id_producto
+        tests:
+          - not_null
+      - name: lote
+        tests:
+          - not_null
+      - name: stock_disponible
+        tests:
+          - not_null
+      - name: stock_minimo
+        tests:
+          - not_null
+      - name: stock_maximo
+        tests:
+          - not_null
+      - name: fecha_vencimiento
+        tests:
+          - not_null
+
+  - name: stg_archivos__proveedores_precios
+    description: "Precios de proveedores tipados y limpiados desde raw"
+    columns:
+      - name: id_proveedor
+        tests:
+          - not_null
+      - name: proveedor
+        tests:
+          - not_null
+      - name: id_producto
+        tests:
+          - not_null
+      - name: costo_proveedor
+        tests:
+          - not_null
+      - name: plazo_dias
+        tests:
+          - not_null
+      - name: fecha_vigencia
+        tests:
+          - not_null
+
+  - name: stg_archivos__devoluciones
+    description: "Devoluciones tipadas y limpiadas desde raw"
+    columns:
+      - name: id_devolucion
+        tests:
+          - unique
+          - not_null
+      - name: fecha
+        tests:
+          - not_null
+      - name: id_venta
+        tests:
+          - not_null
+      - name: id_producto
+        tests:
+          - not_null
+      - name: cantidad
+        tests:
+          - not_null
+      - name: motivo
+        tests:
+          - not_null
+
+  - name: stg_archivos__metas_ventas
+    description: "Metas mensuales tipadas y limpiadas desde raw"
+    columns:
+      - name: periodo
+        tests:
+          - not_null
+      - name: id_sucursal
+        tests:
+          - not_null
+      - name: meta_ventas
+        tests:
+          - not_null
+      - name: meta_unidades
+        tests:
+          - not_null
+
+  - name: stg_archivos__promociones
+    description: "Promociones tipadas y limpiadas desde raw"
+    columns:
+      - name: id_promocion
+        tests:
+          - unique
+          - not_null
+      - name: nombre
+        tests:
+          - not_null
+      - name: fecha_inicio
+        tests:
+          - not_null
+      - name: fecha_fin
+        tests:
+          - not_null
+      - name: id_categoria
+        tests:
+          - not_null
+      - name: porcentaje_descuento
+        tests:
+          - not_null
