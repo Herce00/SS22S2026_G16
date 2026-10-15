@@ -39,11 +39,11 @@ Las rutas son relativas a `Proyecto1/` y los comandos se ejecutan desde esa carp
 
 Sin código. Cada respuesta se anota en "Puntos abiertos" de [design.md](design.md) con su fuente.
 
-- [ ] Firma de `pg_input_is_valid` en PostgreSQL 16 y si acepta `numeric(5,4)`; comprobarlo además con una consulta en el contenedor `dw`.
-- [ ] Estrategia incremental por defecto de dbt-postgres 1.11 cuando hay `unique_key`.
-- [ ] Si `/docker-entrypoint-initdb.d` ejecuta subcarpetas.
-- [ ] Versión fija de `dpage/pgadmin4` y comportamiento de `${VAR:?}` en un servicio con perfil inactivo.
-- [ ] Valores reales de `canal`, `metodo_pago`, `estado`, `tipo_cliente`, `motivo` y `activo`, consultados en `raw`.
+- [x] Firma de `pg_input_is_valid` en PostgreSQL 16 y si acepta `numeric(5,4)`; comprobarlo además con una consulta en el contenedor `dw`.
+- [x] Estrategia incremental por defecto de dbt-postgres 1.11 cuando hay `unique_key`.
+- [x] Si `/docker-entrypoint-initdb.d` ejecuta subcarpetas.
+- [x] Versión fija de `dpage/pgadmin4` y comportamiento de `${VAR:?}` en un servicio con perfil inactivo.
+- [x] Valores reales de `canal`, `metodo_pago`, `estado`, `tipo_cliente`, `motivo` y `activo`, consultados en `raw`.
 
 **Verificación:** los cinco puntos quedan marcados con su respuesta.
 **Commit:** `docs(p1): confirm postgres, dbt and pgadmin details for closing fixes`
