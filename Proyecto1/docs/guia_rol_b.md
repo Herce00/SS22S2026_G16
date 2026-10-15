@@ -31,6 +31,8 @@ El Rol A ha completado la infraestructura de ingesta y orquestación técnica de
 5. **Esqueleto de proyecto dbt:**
    - Inicializado en `Proyecto1/dbt_project/` con configuración lista para conectar a `sgfood_dw`.
 
+**Estado actual (2026-10-14).** El Rol B construyó sobre ese esqueleto las tres capas de modelos (12 de `staging`, 5 de `intermediate`, 7 dimensiones y 5 hechos en `marts`), sus pruebas y las validaciones finales. Después, con su autorización, el Rol A aplicó los ajustes de cierre de la rama `fix/ajustes-cierre` (claves estables, conversiones tolerantes, restricciones físicas, pruebas y ingresos solo de ventas completadas). Cada cambio y su motivo están en [cambios_ajustes_cierre.md](cambios_ajustes_cierre.md).
+
 ---
 
 ## 2. Arranque en 5 pasos
@@ -86,7 +88,7 @@ docker compose exec airflow-scheduler airflow dags unpause -y sgfood_elt
 docker compose exec airflow-scheduler airflow dags trigger sgfood_elt
 ```
 
-### Paso 5: Probar dbt sobre el esqueleto
+### Paso 5: Probar dbt
 
 Verifica la conexión del proyecto dbt:
 
@@ -147,15 +149,15 @@ El Rol B tiene autonomía total dentro de `Proyecto1/dbt_project/`:
 1. **Crear modelos de Staging:**
    - Agrega archivos `.sql` dentro de `Proyecto1/dbt_project/models/staging/`.
    - Consume las fuentes de `raw` usando la macro `{{ source('oltp', 'tabla') }}` o `{{ source('archivos', 'tabla') }}` declaradas en `_fuentes.yml`.
-   - Convierte los tipos desde `TEXT`. Hazlo de forma tolerante: un `::int` directo detiene el modelo ante un solo valor inválido. El modelo de ejemplo muestra el patrón: `CASE WHEN id_producto ~ '^[0-9]+$' THEN id_producto::int END`, y una prueba `not_null` reporta lo que no se pudo convertir.
+   - Convierte los tipos desde `TEXT` con el macro `convertir_seguro`: `{{ convertir_seguro('id_producto', 'INTEGER') }}`. Un `::int` directo detiene el modelo ante un solo valor inválido; el macro deja `NULL` (usa `pg_input_is_valid`) y una prueba `not_null` reporta lo que no se pudo convertir.
    - El tipo esperado de cada columna está en `Proyecto1/docs/contrato_raw.md`.
 2. **Crear modelos de Intermediate y Marts:**
    - Agrega modelos intermedios en `Proyecto1/dbt_project/models/intermediate/`.
-   - Agrega dimensiones y tablas de hechos en `Proyecto1/dbt_project/models/marts/`.
+   - Agrega dimensiones y tablas de hechos en `Proyecto1/dbt_project/models/marts/`. La clave sustituta se genera con `{{ clave_sustituta(['id_natural']) }}` y las restricciones físicas se declaran con `clave_primaria` y `clave_foranea` en el `post_hook`.
    - Usa `{{ ref('nombre_modelo') }}` para referenciar modelos previos.
 3. **Schemas automáticos:**
    - Gracias a la macro `macros/generate_schema_name.sql`, dbt escribe directamente en los schemas `staging` y `marts` del Data Warehouse sin prefijos redundantes.
-   - **`intermediate` no tiene schema asignado.** Tal como está, un modelo en esa carpeta se crea en `public`. Dónde vive esa capa es decisión tuya: agrega `+schema: staging`, u otro nombre, bajo `intermediate` en `dbt_project.yml`.
+   - La capa `intermediate` se crea en el schema `staging` (`+schema: staging` en `dbt_project.yml`). Con la variable `prefijo_schema` puedes escribir en schemas paralelos para pruebas.
 4. **Integración automática en el pipeline:**
    - Cada vez que el DAG `sgfood_elt` se ejecute, correrá automáticamente `dbt run` y `dbt test` sobre todos tus modelos agregados. No necesitas modificar ningún archivo de Airflow, Python ni Docker.
 
@@ -176,10 +178,10 @@ Además de las pruebas de dbt (`dbt test`), el DAG cuenta con una tarea final (`
 4. **Ejemplo (`01_ventas_sin_cliente.sql`):**
    ```sql
    -- Verifica que ninguna venta en el mart carezca de cliente dimensionado
-   SELECT v.id_venta, v.id_cliente
-   FROM marts.fct_ventas v
-   LEFT JOIN marts.dim_cliente c ON v.id_cliente = c.id_cliente
-   WHERE c.id_cliente IS NULL;
+   SELECT v.venta_linea_key, v.cliente_key
+   FROM marts.fct_ventas_linea v
+   LEFT JOIN marts.dim_cliente c ON v.cliente_key = c.cliente_key
+   WHERE c.cliente_key IS NULL;
    ```
 
 ---
@@ -191,11 +193,11 @@ Además de las pruebas de dbt (`dbt test`), el DAG cuenta con una tarea final (`
 | `Proyecto1/data/`                | Rol A           | Archivos de datos inmutables byte a byte. No editar ni renombrar.                              |
 | `Proyecto1/python/`              | Rol A           | Código de ingesta y conexiones. Rol B lo consume como servicio.                                |
 | `Proyecto1/airflow/`             | Rol A           | Definición de DAGs y orquestación. Parámetros dinámicos vía `params`.                          |
-| `Proyecto1/dbt_project/`         | **Rol B**       | Propiedad exclusiva de B tras la entrega del esqueleto.                                        |
+| `Proyecto1/dbt_project/`         | **Rol B**       | Propiedad de B tras la entrega del esqueleto. Desde el 2026-10-14 A puede editarla para los ajustes de cierre (D12) e informa cada cambio. |
 | `Proyecto1/sql/ddl/`             | Rol A           | DDL de schemas y tablas de `raw`. Las tablas de `staging` y `marts` las crea dbt, no este DDL. |
-| `Proyecto1/sql/validaciones/`    | **Rol B**       | Consultas analíticas y de validación. La subcarpeta `dag/` es la que ejecuta el DAG.           |
+| `Proyecto1/sql/validaciones/`    | **Rol B**       | Consultas analíticas y de validación. La subcarpeta `dag/` es la que ejecuta el DAG. Misma autorización de D12. |
 | `Proyecto1/docs/contrato_raw.md` | Compartido      | Interfaz entre los dos roles. Se cambia solo con acuerdo.                                      |
-| `Proyecto1/tests/`               | Rol A           | Pruebas de entorno, contrato, ingesta y DAG. No dependen del contenido de `dbt_project/`.      |
+| `Proyecto1/tests/`               | Rol A           | Pruebas de entorno, contrato, ingesta y DAG. No dependen del contenido de `dbt_project/`. `tests/cierre/` prueba los ajustes de cierre contra los modelos. |
 
 ### Qué puedes cambiar sin avisar
 
@@ -234,8 +236,8 @@ Lo que sigue es el alcance del Rol B según el enunciado y la rúbrica. El esque
 ### Decisiones abiertas que son tuyas
 
 - [x] En qué schema se materializa `intermediate`.
-- [x] Si se usan los casos de `casos_calidad_opcionales.csv` y cómo. No se cargan en la corrida principal (decisión D8).
-- [x] Conservar, modificar o eliminar el modelo de ejemplo `stg_oltp__sucursal`.
+- [x] Si se usan los casos de `casos_calidad_opcionales.csv` y cómo. No se cargan en la corrida principal (decisión D8, cerrada el 2026-10-14): `sql/calidad/cargar_casos_calidad.py` los carga en una copia de `raw` (`raw_calidad`) para demostrar que las pruebas dbt los detectan.
+- [x] Conservar, modificar o eliminar el modelo de ejemplo `stg_oltp__sucursal`. Se conservó y ahora usa `convertir_seguro`.
 
 ### Opcional
 

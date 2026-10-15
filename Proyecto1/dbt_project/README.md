@@ -1,197 +1,98 @@
 # Proyecto dbt SG-Food
 
-Este proyecto dbt fue inicializado por el **Rol A** como esqueleto base para el **Rol B** (transformación y modelado dimensional).
+Proyecto dbt del pipeline ELT de SG-Food. El Rol A dejó el esqueleto (conexión, macro de schemas y fuentes) y el Rol B construyó sobre él las tres capas de modelos. Los ajustes de cierre posteriores (claves estables, conversiones tolerantes, restricciones físicas y pruebas) están descritos en [docs/cambios_ajustes_cierre.md](../docs/cambios_ajustes_cierre.md).
 
-## Estructura del proyecto
+## Estructura
 
 ```text
 dbt_project/
-├── dbt_project.yml              # Configuración general y materializaciones por carpeta
-├── profiles.yml                 # Perfil de conexión a PostgreSQL usando variables de entorno DW_*
-├── README.md                    # Esta guía
+├── dbt_project.yml              # Nombre, perfil, rutas y materialización por carpeta
+├── profiles.yml                 # Conexión a PostgreSQL con las variables DW_* (sin credenciales literales)
 ├── macros/
-│   └── generate_schema_name.sql # Macro que respeta exactamente los schemas staging y marts
+│   ├── generate_schema_name.sql # Escribe directamente en staging y marts; admite el prefijo de schema de pruebas
+│   ├── convertir_seguro.sql     # Conversión de TEXT a otro tipo que devuelve NULL ante un valor inválido
+│   ├── clave_sustituta.sql      # Clave sustituta determinista (MD5 de la clave natural)
+│   └── restricciones.sql        # Claves primarias y foráneas físicas de marts (post_hook)
 ├── models/
-    ├── staging/
-    │   ├── _fuentes.yml         # Declaración de las 12 fuentes cargadas en raw
-    │   ├── _staging.yml         # Descripciones y pruebas de calidad
-    │   ├── stg_oltp__sucursal.sql
-    │   ├── stg_oltp__categoria.sql
-    │   ├── stg_oltp__marca.sql
-    │   ├── stg_oltp__producto.sql
-    │   ├── stg_oltp__cliente.sql
-    │   ├── stg_oltp__venta.sql
-    │   ├── stg_oltp__venta_detalle.sql
-    │   ├── stg_archivos__inventario_bodega.sql
-    │   ├── stg_archivos__proveedores_precios.sql
-    │   ├── stg_archivos__devoluciones.sql
-    │   ├── stg_archivos__metas_ventas.sql
-    │   └── stg_archivos__promociones.sql
-    ├── intermediate/
-    │   ├── _intermediate.yml
-    │   ├── int_ventas_linea.sql
-    │   ├── int_inventario_snapshot.sql
-    │   ├── int_devoluciones.sql
-    │   ├── int_metas_ventas.sql
-    │   └── int_precios_proveedor.sql
-    └── marts/
-        ├── _marts.yml
-        ├── dim_fecha.sql
-        ├── dim_sucursal.sql
-        ├── dim_cliente.sql
-        ├── dim_categoria.sql
-        ├── dim_marca.sql
-        ├── dim_producto.sql
-        ├── dim_promocion.sql
-        ├── fct_ventas_linea.sql
-        ├── fct_inventario_snapshot.sql
-        ├── fct_devoluciones.sql
-        ├── fct_metas_ventas.sql
-        └── fct_precios_proveedor.sql
-└── tests/
-    └── assert_ventas_subtotal_consistente.sql
+│   ├── staging/                 # 12 vistas, una por tabla de raw (_fuentes.yml, _staging.yml)
+│   ├── intermediate/            # 5 vistas con joins y lógica reutilizable (_intermediate.yml)
+│   └── marts/                   # 7 dimensiones y 5 hechos (_marts.yml)
+└── tests/                       # Pruebas singulares (reglas de negocio)
 ```
 
-La capa `staging` contiene actualmente 12 vistas, una por cada fuente de `raw`. No realiza joins: únicamente selecciona las columnas, limpia cadenas y convierte valores desde `TEXT` a `INTEGER`, `BIGINT`, `NUMERIC`, `DATE` o `BOOLEAN` cuando el formato es válido.
+Los modelos `intermediate` se crean en el schema `staging` (`+schema: staging` en `dbt_project.yml`).
 
-## Componentes base y decisiones abiertas para Rol B
+## Materialización
 
-| Componente | Qué provee Rol A | Qué decide Rol B |
-|------------|------------------|------------------|
-| `profiles.yml` | Conexión a `sgfood_dw` con `env_var` (`DW_HOST`, `DW_PORT`, `DW_DB`, `DW_USER`, `DW_PASSWORD`). | Agregar targets adicionales o hilos si se requiere. |
-| `macros/generate_schema_name.sql` | Evita que dbt cree schemas compuestos como `staging_staging` o `public_staging`, escribiendo directamente en `staging` y `marts`. | Mantener o ajustar si requiere schemas por desarrollador. |
-| `models/staging/_fuentes.yml` | Declaración de las 12 tablas de `raw` con sus columnas según el contrato. | Agregar descripciones de columnas, tests de fuentes y freshness. |
-| `models/staging/*.sql` | 12 modelos que consumen las fuentes `oltp` y `archivos`, convierten tipos y limpian valores sin hacer joins. | Mantener las convenciones al agregar transformaciones. |
-| `models/staging/_staging.yml` | Descripciones y pruebas `unique`, `not_null` y `accepted_values` para staging. El catálogo de `canal` incluye `Tienda`, `Televenta`, `Mayorista` y `Web`. | Ampliar pruebas cuando se agreguen reglas de calidad. |
-| `models/intermediate/` | Cinco vistas con joins y lógica reutilizable; materializadas en `staging`. | Mantener la lógica reutilizable antes de los marts. |
-| `models/marts/` | Siete dimensiones y cinco hechos materializados como tablas en `marts`, con pruebas de claves y relaciones. | Mantener pruebas y agregar modelos si aparecen nuevos procesos. |
+| Capa | Materialización | Schema | Modelos |
+|------|-----------------|--------|---------|
+| `staging` | Vista | `staging` | 12 |
+| `intermediate` | Vista | `staging` | 5 |
+| `marts` | Tabla | `marts` | 7 dimensiones y 4 hechos |
+| `marts` | Incremental | `marts` | `fct_ventas_linea` |
 
-## Dos cosas que conviene saber antes de empezar
+## Macros
 
-**Los modelos de `intermediate` se crean en `staging`.** La configuración de `dbt_project.yml` asigna `+schema: staging` y `+materialized: view`, de modo que la lógica intermedia queda separada conceptualmente por carpeta, pero reutilizable dentro del schema de preparación.
+| Macro | Qué hace | Dónde se usa |
+|-------|----------|--------------|
+| `convertir_seguro(columna, tipo)` | Convierte `TEXT` con `pg_input_is_valid` de PostgreSQL 16, el mismo analizador del cast. Un valor inválido (`2026-02-30`, mes `13`, un decimal fuera de `NUMERIC(5,4)`, un entero que desborda) queda en `NULL` y `dbt run` no se detiene. Mantiene dos reglas de negocio como condiciones explícitas: las fechas deben tener formato ISO y los números no pueden ser negativos | Los 12 modelos de `staging` y `int_metas_ventas` |
+| `clave_sustituta(columnas)` | `MD5` de la clave natural. La misma entidad recibe la misma clave en cualquier ejecución, sin importar el orden ni cuántas filas existan. Una clave natural nula se trata como texto vacío para que la clave nunca sea `NULL`; la prueba `not_null` de la clave natural reporta el problema | Las seis dimensiones y la clave de `fct_ventas_linea` |
+| `clave_primaria(columna)`, `clave_foranea(columna, dimension, columna_dimension)` | Crean las restricciones físicas con `post_hook`, de forma idempotente: eliminan la restricción si existe y la vuelven a crear | Los 12 modelos de `marts` |
+| `generate_schema_name` | Usa el schema personalizado tal cual. Con la variable `prefijo_schema` escribe en schemas paralelos (por ejemplo `cierre_staging`) | Todos los modelos |
 
-**Las conversiones de tipo deben tolerar valores inválidos.** `raw` entrega todo como `TEXT`. Un `::int` directo detiene el modelo completo ante un solo valor malo. El modelo de ejemplo muestra el patrón recomendado: convertir solo si el texto tiene la forma esperada y dejar `NULL` en caso contrario, para que lo detecte una prueba `not_null`.
+## Claves y restricciones
 
-```sql
-CASE WHEN id_sucursal ~ '^[0-9]+$' THEN id_sucursal::int END AS id_sucursal
+- Las claves sustitutas `*_key` son texto (`MD5`), excepto `dim_fecha.fecha_key` (entero `AAAAMMDD`) y `fct_devoluciones.devolucion_key` (el identificador de la devolución). Los hechos se unen a las dimensiones por clave natural y toman la clave sustituta de la dimensión.
+- Cada tabla de `marts` tiene clave primaria física, y cada clave foránea de los hechos (y las de `dim_producto` y `dim_promocion`) existe como restricción. dbt reconstruye una dimensión con `DROP ... CASCADE`, que elimina las claves foráneas que la referencian; los hechos se construyen después y las vuelven a crear. Por eso el pipeline se puede ejecutar varias veces seguidas.
+- Las claves foráneas admiten `NULL`. Una venta cuyo cliente no se encontró queda con `cliente_key` nulo, y la prueba `not_null` de `fct_ventas_linea` lo reporta.
+- Si cambia el tipo de una clave en un entorno que ya tiene `marts`, ejecute una vez `dbt run --full-refresh`: el hecho incremental conserva las columnas de la ejecución anterior.
+- El DDL del schema, extraído de la base después de una ejecución real, está en [sql/ddl/referencia/03_marts_referencia.sql](../sql/ddl/referencia/03_marts_referencia.sql). Es solo documentación: dbt crea las tablas y el archivo no se ejecuta al iniciar el DW.
+
+## Hecho incremental
+
+`fct_ventas_linea` es `incremental` con `unique_key='id_detalle'`. En dbt-postgres 1.11 una clave única usa la estrategia `delete+insert`: la fila con el mismo `id_detalle` se reemplaza. El filtro compara `_loaded_at` con el máximo ya cargado, así que un cambio en la fuente (por ejemplo una venta que pasa de `PENDIENTE` a `ANULADA`) llega al hecho.
+
+La ingesta trunca y recarga `raw` en cada ejecución, de modo que todas las filas llegan con un `_loaded_at` nuevo y el incremental las vuelve a procesar todas. El resultado es correcto; la ventaja de rendimiento aparecería con una ingesta incremental. Una línea eliminada en la fuente no se elimina del hecho; la fuente no elimina líneas.
+
+## Pruebas
+
+| Dónde | Pruebas |
+|-------|---------|
+| `marts` | `unique` y `not_null` en toda clave sustituta; `relationships` en toda clave foránea de los hechos y de `dim_promocion`; `accepted_values` en `canal`, `metodo_pago`, `estado`, `tipo_cliente`, `motivo` y `activo` |
+| `staging` | `not_null` en toda columna obligatoria del contrato raw; `relationships` de `venta_detalle.id_venta` hacia `venta`, y de `venta.id_cliente` y `venta.id_sucursal` hacia sus tablas |
+| Singulares (`tests/`) | `assert_ventas_subtotal_consistente`, `assert_ventas_cantidad_positiva`, `assert_ventas_descuento_en_rango`, `assert_inventario_vencimiento_posterior_al_corte`, `assert_metas_positivas`, `assert_devolucion_no_supera_venta` |
+
+`int_ventas_linea` usa `LEFT JOIN` con la venta: una línea sin venta no se descarta, llega al hecho y la prueba de relación de `staging` la reporta.
+
+### Casos de calidad opcionales
+
+Los 10 casos de `data/casos_calidad_opcionales.csv` no se cargan en la corrida principal. El script [sql/calidad/cargar_casos_calidad.py](../sql/calidad/cargar_casos_calidad.py) crea el schema `raw_calidad` como copia de `raw` y aplica cada caso a una fila distinta. Después se prueba contra esa copia sin tocar `staging` ni `marts`:
+
+```bash
+docker compose exec -T airflow-scheduler python /opt/airflow/sql/calidad/cargar_casos_calidad.py
+docker compose exec -T airflow-scheduler /opt/dbt-venv/bin/dbt run  --project-dir /opt/airflow/dbt_project --profiles-dir /opt/airflow/dbt_project --vars '{schema_raw: raw_calidad, prefijo_schema: cierre_}'
+docker compose exec -T airflow-scheduler /opt/dbt-venv/bin/dbt test --project-dir /opt/airflow/dbt_project --profiles-dir /opt/airflow/dbt_project --vars '{schema_raw: raw_calidad, prefijo_schema: cierre_}'
+docker compose exec -T airflow-scheduler python /opt/airflow/sql/calidad/cargar_casos_calidad.py --limpiar
 ```
 
-## Estado actual de la implementación
-
-| Capa | Estado | Materialización | Schema |
-|------|--------|-----------------|--------|
-| `raw` | Implementada por Rol A | Tablas | `raw` |
-| `staging` | Implementada: 12 modelos con pruebas | Vistas | `staging` |
-| `intermediate` | Implementada: 5 modelos con pruebas | Vistas | `staging` |
-| `marts` | Implementada: dimensiones y hechos con pruebas | Tablas | `marts` |
-
-## Validar staging
-
-Desde la carpeta `Proyecto1`, con Docker levantado y los datos cargados en `raw`:
-
-```powershell
-docker compose exec airflow-scheduler `
-  /opt/dbt-venv/bin/dbt ls `
-  --project-dir /opt/airflow/dbt_project `
-  --profiles-dir /opt/airflow/dbt_project `
-  --select path:models/staging
-
-docker compose exec airflow-scheduler `
-  /opt/dbt-venv/bin/dbt compile `
-  --project-dir /opt/airflow/dbt_project `
-  --profiles-dir /opt/airflow/dbt_project `
-  --select path:models/staging
-
-docker compose exec airflow-scheduler `
-  /opt/dbt-venv/bin/dbt build `
-  --project-dir /opt/airflow/dbt_project `
-  --profiles-dir /opt/airflow/dbt_project `
-  --select path:models/staging
-```
-
-El resultado esperado es que se reconozcan 12 modelos, compilen correctamente y las pruebas terminen con estado `PASS`.
-
-## Validar intermediate y marts
-
-```powershell
-docker compose exec airflow-scheduler `
-  /opt/dbt-venv/bin/dbt build `
-  --project-dir /opt/airflow/dbt_project `
-  --profiles-dir /opt/airflow/dbt_project `
-  --select path:models/intermediate
-
-docker compose exec airflow-scheduler `
-  /opt/dbt-venv/bin/dbt build `
-  --project-dir /opt/airflow/dbt_project `
-  --profiles-dir /opt/airflow/dbt_project `
-  --select path:models/marts
-```
-
-## Prueba personalizada y documentación
-
-La prueba singular `tests/assert_ventas_subtotal_consistente.sql` valida que cada subtotal sea igual al importe bruto menos el descuento, con tolerancia de un centavo.
-
-Para generar la documentación navegable:
-
-```powershell
-docker compose exec airflow-scheduler `
-  /opt/dbt-venv/bin/dbt docs generate `
-  --project-dir /opt/airflow/dbt_project `
-  --profiles-dir /opt/airflow/dbt_project
-```
-
-Las descripciones se mantienen en [_staging.yml](models/staging/_staging.yml), [_intermediate.yml](models/intermediate/_intermediate.yml) y [_marts.yml](models/marts/_marts.yml).
-
-`fct_ventas_linea` es la excepción: se materializa como `incremental` con `id_detalle` como clave única para no reconstruir todas las líneas en cada ejecución.
-
-## Validar intermediate
-
-Para validar la capa intermedia completa:
-
-```powershell
-docker compose exec airflow-scheduler `
-  /opt/dbt-venv/bin/dbt build `
-  --project-dir /opt/airflow/dbt_project `
-  --profiles-dir /opt/airflow/dbt_project `
-  --select path:models/intermediate
-```
-
-Los cinco modelos deben compilar y sus pruebas deben finalizar con estado `PASS`.
-
-## Validar marts
-
-Para construir la capa dimensional completa, incluyendo sus dependencias:
-
-```powershell
-docker compose exec airflow-scheduler `
-  /opt/dbt-venv/bin/dbt build `
-  --project-dir /opt/airflow/dbt_project `
-  --profiles-dir /opt/airflow/dbt_project `
-  --select path:models/marts
-```
-
-El selector `path:models/marts` ejecuta los modelos de marts y sus dependencias en orden. La ejecución correcta debe crear siete dimensiones, cinco hechos y finalizar las pruebas con estado `PASS`.
+`_fuentes.yml` usa `schema: "{{ var('schema_raw', 'raw') }}"`, y `prefijo_schema` envía los modelos a `cierre_staging` y `cierre_marts`. Cada uno de los 10 casos hace fallar al menos una prueba (ver `evidencia/casos_calidad_resultado.txt`).
 
 ## Cómo ejecutar dbt
 
-### 1. Desde dentro del contenedor de Airflow (recomendado)
+Desde `Proyecto1/`, dentro del contenedor del scheduler (recomendado):
 
 ```bash
-docker compose exec airflow-scheduler /opt/dbt-venv/bin/dbt debug --project-dir /opt/airflow/dbt_project --profiles-dir /opt/airflow/dbt_project
-docker compose exec airflow-scheduler /opt/dbt-venv/bin/dbt run --project-dir /opt/airflow/dbt_project --profiles-dir /opt/airflow/dbt_project
-docker compose exec airflow-scheduler /opt/dbt-venv/bin/dbt test --project-dir /opt/airflow/dbt_project --profiles-dir /opt/airflow/dbt_project
+docker compose exec -T airflow-scheduler /opt/dbt-venv/bin/dbt debug --project-dir /opt/airflow/dbt_project --profiles-dir /opt/airflow/dbt_project
+docker compose exec -T airflow-scheduler /opt/dbt-venv/bin/dbt run   --project-dir /opt/airflow/dbt_project --profiles-dir /opt/airflow/dbt_project
+docker compose exec -T airflow-scheduler /opt/dbt-venv/bin/dbt test  --project-dir /opt/airflow/dbt_project --profiles-dir /opt/airflow/dbt_project
 ```
 
-### 2. Desde el host (con dbt-postgres instalado en venv local)
+Para ejecutar solo una capa, use el selector `path:models/staging`, `path:models/intermediate` o `path:models/marts`. Un selector `path:` ejecuta únicamente los modelos de esa carpeta: no incluye sus dependencias. Para incluirlas anteponga `+` (`--select +path:models/marts`) o ejecute el proyecto completo, que es lo que hace el DAG.
 
-Configurar las variables de entorno o crear un `.env`:
-- `DW_HOST=localhost`
-- `DW_PORT=5433`
-- `DW_DB=sgfood_dw`
-- `DW_USER=dw_user`
-- `DW_PASSWORD=...`
+Para generar la documentación navegable:
 
-Y ejecutar:
 ```bash
-dbt run --project-dir Proyecto1/dbt_project --profiles-dir Proyecto1/dbt_project
+docker compose exec -T airflow-scheduler /opt/dbt-venv/bin/dbt docs generate --project-dir /opt/airflow/dbt_project --profiles-dir /opt/airflow/dbt_project
 ```
+
+Las descripciones de cada modelo y columna están en [_staging.yml](models/staging/_staging.yml), [_intermediate.yml](models/intermediate/_intermediate.yml) y [_marts.yml](models/marts/_marts.yml).

@@ -1,0 +1,7 @@
+   estado   | ventas | lineas |  importe  
+------------+--------+--------+-----------
+ ANULADA    |     48 |    139 |  41769.16
+ COMPLETADA |   1129 |   3014 | 780201.72
+ PENDIENTE  |     23 |     56 |  16481.19
+(3 rows)
+

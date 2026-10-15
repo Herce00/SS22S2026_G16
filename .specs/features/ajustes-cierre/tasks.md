@@ -154,22 +154,22 @@ Sin código. Cada respuesta se anota en "Puntos abiertos" de [design.md](design.
 
 ## T12 — Documentación y aviso a B
 
-- [ ] `_marts.yml`: descripción de cada modelo y cada columna.
-- [ ] `README.md`: corregir las afirmaciones señaladas en la revisión; explicar claves, incremental, restricciones, regla de ingresos y casos de calidad; cada cifra tomada de la evidencia nueva.
-- [ ] `dbt_project/README.md`: quitar las secciones repetidas y la afirmación incorrecta sobre selección de modelos; documentar los macros nuevos.
-- [ ] `docs/guia_rol_b.md` y [architecture.md](../../steering/architecture.md): estado final y decisiones.
-- [ ] Indicar si hace falta una captura nueva de Airflow.
-- [ ] Redactar `docs/cambios_ajustes_cierre.md` para B: cada cambio, su motivo y el archivo afectado.
-- [ ] Ejecutar `dbt docs generate` sin errores.
+- [x] `_marts.yml`: descripción de cada modelo y cada columna.
+- [x] `README.md`: corregir las afirmaciones señaladas en la revisión; explicar claves, incremental, restricciones, regla de ingresos y casos de calidad; cada cifra tomada de la evidencia nueva.
+- [x] `dbt_project/README.md`: quitar las secciones repetidas y la afirmación incorrecta sobre selección de modelos; documentar los macros nuevos.
+- [x] `docs/guia_rol_b.md` y [architecture.md](../../steering/architecture.md): estado final y decisiones.
+- [x] Indicar si hace falta una captura nueva de Airflow.
+- [x] Redactar `docs/cambios_ajustes_cierre.md` para B: cada cambio, su motivo y el archivo afectado.
+- [x] Ejecutar `dbt docs generate` sin errores.
 
 **Verificación:** ninguna afirmación del README contradice el código o la evidencia; revisión manual contra la lista de hallazgos.
 **Commit:** `docs(p1): align documentation with closing fixes`
 
 ## Definición de terminado
 
-- [ ] Los catorce hallazgos de [requirements.md](requirements.md) están resueltos o tienen una explicación registrada.
-- [ ] Todos los escenarios Gherkin pasan.
-- [ ] La suite completa pasa en un entorno limpio.
-- [ ] El DAG corre en verde dos veces seguidas con las restricciones físicas activas.
-- [ ] B tiene el resumen de cambios.
-- [ ] Pull request de `fix/ajustes-cierre` hacia `main` listo para abrir.
+- [x] Los catorce hallazgos de [requirements.md](requirements.md) están resueltos o tienen una explicación registrada.
+- [x] Todos los escenarios Gherkin pasan.
+- [x] La suite completa pasa en un entorno limpio.
+- [x] El DAG corre en verde dos veces seguidas con las restricciones físicas activas.
+- [x] B tiene el resumen de cambios.
+- [x] Pull request de `fix/ajustes-cierre` hacia `main` listo para abrir.

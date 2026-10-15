@@ -144,3 +144,29 @@ def test_linea_huerfana_llega_al_hecho_y_la_prueba_la_reporta(copia_raw):
     assert res_test.returncode != 0
     fallas = [l for l in res_test.stdout.splitlines() if "FAIL" in l and "relationships_stg_oltp__venta_detalle_id_venta" in l]
     assert fallas, "la prueba relationships de venta_detalle.id_venta debio fallar"
+
+
+# --- R6.1: descripciones ------------------------------------------------------------------
+
+
+def _descripciones():
+    with open(os.path.join(MODELOS, "marts", "_marts.yml"), encoding="utf-8") as f:
+        return yaml.safe_load(f)["models"]
+
+
+def test_cada_modelo_y_columna_de_marts_tiene_descripcion():
+    sin = []
+    for m in _descripciones():
+        if not m.get("description"):
+            sin.append(m["name"])
+        sin += [f"{m['name']}.{c['name']}" for c in m["columns"] if not c.get("description")]
+    assert not sin, f"sin descripcion: {sin}"
+
+
+@pytest.mark.integracion
+def test_las_columnas_documentadas_son_todas_las_columnas_de_marts():
+    documentadas = {(m["name"], c["name"]) for m in _descripciones() for c in m["columns"]}
+    reales = {tuple(f) for f in psql(
+        "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = 'marts'"
+    )}
+    assert reales == documentadas, f"sin documentar: {sorted(reales - documentadas)}; sobran: {sorted(documentadas - reales)}"

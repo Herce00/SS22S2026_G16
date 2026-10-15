@@ -24,9 +24,11 @@ Macro nuevo `macros/clave_sustituta.sql`:
 
 ```sql
 {% macro clave_sustituta(columnas) -%}
-    MD5({{ columnas | join(" || '|' || ") }}::TEXT)
+    MD5({% for c in columnas %}COALESCE({{ c }}::TEXT, ''){% if not loop.last %} || '|' || {% endif %}{% endfor %})
 {%- endmacro %}
 ```
+
+*Implementado así (T4 y T9):* cada columna se convierte a `TEXT` y una clave natural nula se trata como texto vacío, para que la clave nunca sea `NULL` y la clave primaria física no impida terminar `dbt run`; la prueba `not_null` de la clave natural reporta el problema.
 
 | Modelo | Clave natural | Antes | Después |
 |--------|---------------|-------|---------|
@@ -73,6 +75,8 @@ Macro nuevo `macros/convertir_seguro.sql`:
          THEN TRIM({{ columna }})::{{ tipo }} END
 {%- endmacro %}
 ```
+
+*Implementado así (T3):* el macro agrega dos condiciones explícitas que conservan las reglas de negocio de B: las fechas deben tener formato ISO y los enteros y decimales deben empezar con un dígito (no admiten signo, `NaN` ni `Infinity`; parámetro `no_negativo`, verdadero por defecto). El periodo de metas (`AAAA-MM`) se valida convirtiendo `periodo || '-01'` como fecha.
 
 - Reemplaza todas las conversiones de los 12 modelos de `staging` y la de `int_metas_ventas`.
 - Mantiene las reglas de negocio que B ya aplicaba, por ejemplo precios no negativos, como condiciones aparte y explícitas.
@@ -141,18 +145,19 @@ Los valores de `accepted_values` se obtienen consultando `raw`, no se suponen.
 
 ```yaml
 pgadmin:
-  image: dpage/pgadmin4:<versión fija>
+  image: dpage/pgadmin4:9.18.0
   profiles: ["herramientas"]
   ports:
     - "${PGADMIN_PORT:-8081}:80"
   environment:
-    PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:?PGADMIN_EMAIL is required}
-    PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:?PGADMIN_PASSWORD is required}
+    PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-pgadmin@example.com}
+    PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-}
   volumes:
     - pgadmin_data:/var/lib/pgadmin
 ```
 
 - Se arranca con `docker compose --profile herramientas up -d pgadmin`.
+- *Implementado así (T10):* la sintaxis `${VAR:?}` sí obliga a definir la variable aunque el perfil esté inactivo (ver "Puntos abiertos"), por eso el correo y la contraseña usan `${VAR:-}`: el correo por defecto es no personal y la contraseña por defecto es vacía, de modo que pgAdmin no inicia sin ella.
 - Las tres variables nuevas van a `.env.example` con valores de ejemplo no personales.
 - La versión fija se confirma en el registro oficial de la imagen.
 - Confirmar que la sintaxis `${VAR:?}` en un servicio con perfil inactivo no obliga a definir la variable para el arranque normal; si lo hace, usar valores por defecto no sensibles solo para esas variables y documentarlo.

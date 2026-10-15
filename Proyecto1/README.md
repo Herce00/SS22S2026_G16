@@ -41,6 +41,7 @@ BD transaccional (oltp_sgfood) ──┐
 | Pruebas y documentación dbt | **Implementadas — Rol B** | [Estructura del proyecto dbt](#estructura-del-proyecto-dbt) |
 | Consultas analíticas y de validación | **Implementadas — Rol B** | [Consultas analíticas y validación](#consultas-analíticas-y-validación) |
 | Justificación de diseño del modelo | **Definida — Rol B** | [Justificación de diseño](#justificación-de-diseño) |
+| Ajustes de cierre (claves, pruebas, restricciones, evidencia) | Terminado | [docs/cambios_ajustes_cierre.md](docs/cambios_ajustes_cierre.md) |
 
 El Rol B tiene su punto de partida en [docs/guia_rol_b.md](docs/guia_rol_b.md).
 
@@ -150,13 +151,23 @@ psql -h localhost -p 5434 -U src_user -d sgfood_src -c "SELECT table_name FROM i
 - **Endpoint de salud:** `http://localhost:8080/api/v2/monitor/health` (o el puerto configurado en `AIRFLOW_PORT`)
 - **Execution API interna:** Los workers y el scheduler se comunican con el api-server a través de `http://airflow-apiserver:8080/execution/` autenticados mediante `AIRFLOW_JWT_SECRET`.
 
+#### pgAdmin (opcional)
+
+pgAdmin 9.18.0 no forma parte del pipeline y no arranca con `docker compose up`. Para usarlo, defina `PGADMIN_EMAIL`, `PGADMIN_PASSWORD` y, si lo necesita, `PGADMIN_PORT` en `.env` (los valores de ejemplo están en `.env.example`) y ejecute:
+
+```bash
+docker compose --profile herramientas up -d pgadmin
+```
+
+Se abre en `http://localhost:8081` (o el puerto de `PGADMIN_PORT`). Sin `PGADMIN_PASSWORD`, pgAdmin no inicia. Se registra el servidor con host `dw`, puerto `5432` y las credenciales `DW_*`.
+
 ### 6. Datos oficiales y Contrato de la capa Raw
 
 Los datos de origen del proyecto residen en `data/` y se versionan de forma binaria/literal byte a byte mediante `.gitattributes` (`data/* -text`):
 
 1. **Base transaccional PostgreSQL (`sgfood_oltp.sql`):** 7 tablas en `oltp_sgfood` con un total de 4.763 registros (`sucursal`: 6, `categoria`: 8, `marca`: 10, `producto`: 80, `cliente`: 250, `venta`: 1.200, `venta_detalle`: 3.209).
 2. **Archivos planos CSV:** 5 archivos de fuentes externas con un total de 4.101 registros (`inventario_bodega.csv`: 3.840, `proveedores_precios.csv`: 103, `devoluciones.csv`: 80, `metas_ventas.csv`: 48, `promociones.csv`: 30).
-3. **Casos de calidad opcionales (`casos_calidad_opcionales.csv`):** 10 registros con anomalías sintéticas. Según la decisión D8 de steering, **no forman parte de la ingesta principal** y su utilización para auditorías de calidad queda bajo criterio de dbt (Rol B).
+3. **Casos de calidad opcionales (`casos_calidad_opcionales.csv`):** 10 registros con anomalías sintéticas. Según la decisión D8 de steering, **no forman parte de la ingesta principal**: no se cargan en `raw`. Se usan solo para demostrar las pruebas de calidad de dbt: [sql/calidad/cargar_casos_calidad.py](sql/calidad/cargar_casos_calidad.py) los aplica sobre una copia de `raw` (`raw_calidad`) y las pruebas se ejecutan contra esa copia, sin tocar `staging` ni `marts` (ver [Casos de calidad](#casos-de-calidad)).
 
 #### Contrato y Especificación Técnica
 - **Contrato de datos v1:** [docs/contrato_raw.md](docs/contrato_raw.md) detalla granularidad, reglas de representación (`NULL`, formatos numéricos y fechas ISO), columnas de auditoría (`_loaded_at`, `_source`) y el diccionario de campos.
@@ -319,19 +330,19 @@ Para la entrega del proyecto, el integrante debe tomar las siguientes capturas d
 
 ### 9. Proyecto de Transformación dbt (dbt_project)
 
-El esqueleto inicial en `Proyecto1/dbt_project/` permite que el **Rol B** construya modelos de staging, intermediate y marts conectando directamente al DW vía PostgreSQL adapter:
+El proyecto `Proyecto1/dbt_project/` conecta directamente al DW con el adaptador de PostgreSQL. El Rol A dejó el esqueleto y el Rol B construyó las tres capas de modelos.
 
-- **Configuración central:** `dbt_project.yml` define materializaciones por carpeta (staging como vista, marts como tabla).
+- **Configuración central:** `dbt_project.yml` define materializaciones por carpeta (staging e intermediate como vista, marts como tabla).
 - **Conexión:** `profiles.yml` lee variables `DW_*` mediante `env_var`.
-- **Macro de Schemas:** `macros/generate_schema_name.sql` garantiza que dbt escriba exactamente en los schemas `staging` y `marts`.
+- **Macros:** `generate_schema_name` (escribe exactamente en `staging` y `marts`), `convertir_seguro` (conversiones de tipo tolerantes), `clave_sustituta` (claves estables) y `restricciones` (claves primarias y foráneas físicas).
 - **Fuentes:** `models/staging/_fuentes.yml` declara las 12 tablas de `raw`.
-- **Ejemplo de Staging:** `models/staging/stg_oltp__sucursal.sql` demuestra el consumo con `source()`, casteo desde `TEXT` y pruebas en `_staging.yml`.
+- **Modelos:** 12 de `staging`, 5 de `intermediate` y 12 de `marts`; el detalle está en [Estructura del proyecto dbt](#estructura-del-proyecto-dbt).
 
-> Consulte la [Guía de Arranque para Rol B](docs/guia_rol_b.md) para detalles completos de ejecución local, desarrollo de nuevos modelos y convenciones.
+> Consulte la [Guía para Rol B](docs/guia_rol_b.md) y [dbt_project/README.md](dbt_project/README.md) para la ejecución local, los macros y las convenciones.
 
 ### 10. Ejecución de pruebas automatizadas
 
-El proyecto cuenta con un arnés completo de pruebas automatizadas en `tests/entorno/`, `tests/contrato/`, `tests/ingesta/` y `tests/dag/` utilizando `pytest`:
+El proyecto cuenta con un arnés completo de pruebas automatizadas en `tests/entorno/`, `tests/contrato/`, `tests/ingesta/`, `tests/dag/` y `tests/cierre/` utilizando `pytest`. Las pruebas de integración llaman a `docker compose`, así que se ejecutan desde el host, con `pytest`, `PyYAML` y `psycopg` instalados:
 
 1. Instale las dependencias de prueba:
    ```bash
@@ -345,8 +356,12 @@ El proyecto cuenta con un arnés completo de pruebas automatizadas en `tests/ent
 
 3. Suite completa de integración (con contenedores activos):
    ```bash
-   pytest tests/entorno tests/contrato tests/ingesta tests/dag
+   pytest tests/entorno tests/contrato tests/ingesta tests/dag tests/cierre
    ```
+
+   `tests/cierre/` verifica los ajustes de cierre contra el pipeline real: claves estables, hecho incremental, conversiones tolerantes, restricciones físicas, regla de ingresos, validaciones finales, casos de calidad y pgAdmin. Las pruebas que modifican la base fuente o `raw` restauran su estado y comprueban el total de 8.864 filas. Las que ejecutan dbt contra datos inválidos usan una copia de `raw` y schemas paralelos, sin tocar `staging` ni `marts`.
+
+   > `tests/entorno/test_schemas.py::test_schemas_have_no_tables` exige que `staging` y `marts` estén vacíos: se ejecuta en un entorno recién creado, antes del primer `dbt run`.
 
 4. Prueba lenta de ciclo limpio de reinicio (`down -v` / `up -d`):
    ```bash
@@ -371,6 +386,8 @@ docker compose up -d
   Si puertos como 5433, 5434 u 8080 están ocupados por otros servicios locales en el host, cambie los valores correspondientes en su archivo `.env` local (por ejemplo `DW_PORT=5443`, `SRC_PORT=5444`, `AIRFLOW_PORT=8089`). No modifique `docker-compose.yml`.
 - **Los schemas no aparecen en el DW:**
   Los scripts de `/docker-entrypoint-initdb.d/` solo se ejecutan cuando el volumen de base de datos está vacío. Si se crearon antes de montar el script, ejecute un reinicio limpio con `docker compose down -v` y vuelva a iniciar.
+- **pgAdmin no inicia o no responde:**
+  pgAdmin es opcional y no arranca con `docker compose up`. Defina `PGADMIN_PASSWORD` en `.env` (hay un ejemplo en `.env.example`) y ejecute `docker compose --profile herramientas up -d pgadmin`. Si el puerto `8081` está ocupado, cambie `PGADMIN_PORT` en `.env`.
 - **Variable requerida faltante:**
   Si falta alguna variable obligatoria en `.env`, `docker compose config` o `docker compose up` fallará indicando el nombre exacto de la variable que debe definirse.
 
@@ -421,7 +438,7 @@ erDiagram
     }
 
     dim_sucursal {
-        int sucursal_key PK
+        string sucursal_key PK
         int id_sucursal UK
         string nombre
         string ciudad
@@ -429,7 +446,7 @@ erDiagram
     }
 
     dim_cliente {
-        int cliente_key PK
+        string cliente_key PK
         int id_cliente UK
         string nit
         string nombre
@@ -440,24 +457,24 @@ erDiagram
     }
 
     dim_categoria {
-        int categoria_key PK
+        string categoria_key PK
         int id_categoria UK
         string nombre
     }
 
     dim_marca {
-        int marca_key PK
+        string marca_key PK
         int id_marca UK
         string nombre
     }
 
     dim_producto {
-        int producto_key PK
+        string producto_key PK
         int id_producto UK
         string sku UK
         string nombre
-        int categoria_key FK
-        int marca_key FK
+        string categoria_key FK
+        string marca_key FK
         string unidad_medida
         decimal costo_base
         decimal precio_lista
@@ -465,12 +482,12 @@ erDiagram
     }
 
     dim_promocion {
-        int promocion_key PK
+        string promocion_key PK
         int id_promocion UK
         string nombre
         int fecha_inicio_key FK
         int fecha_fin_key FK
-        int categoria_key FK
+        string categoria_key FK
         decimal porcentaje_descuento
     }
 
@@ -479,9 +496,9 @@ erDiagram
         bigint id_detalle UK
         bigint id_venta
         int fecha_key FK
-        int cliente_key FK
-        int sucursal_key FK
-        int producto_key FK
+        string cliente_key FK
+        string sucursal_key FK
+        string producto_key FK
         string canal
         string metodo_pago
         string estado
@@ -496,8 +513,8 @@ erDiagram
     fct_inventario_snapshot {
         string inventario_snapshot_key PK
         int fecha_key FK
-        int sucursal_key FK
-        int producto_key FK
+        string sucursal_key FK
+        string producto_key FK
         string lote
         date fecha_vencimiento
         int stock_disponible
@@ -514,7 +531,7 @@ erDiagram
         int id_devolucion UK
         int fecha_key FK
         bigint id_venta
-        int producto_key FK
+        string producto_key FK
         int cantidad
         string motivo
     }
@@ -523,7 +540,7 @@ erDiagram
         string meta_key PK
         int periodo_key FK
         string periodo
-        int sucursal_key FK
+        string sucursal_key FK
         decimal meta_ventas
         int meta_unidades
     }
@@ -532,7 +549,7 @@ erDiagram
         string precio_proveedor_key PK
         int id_proveedor
         string proveedor
-        int producto_key FK
+        string producto_key FK
         int fecha_key FK
         decimal costo_proveedor
         int plazo_dias
@@ -569,7 +586,7 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 
 | Columna | Tipo conceptual | Descripción |
 |---------|-----------------|-------------|
-| `fecha_key` | `INTEGER` | Clave sustituta en formato `YYYYMMDD` |
+| `fecha_key` | `INTEGER` | Clave en formato `YYYYMMDD`; determinista |
 | `fecha` | `DATE` | Fecha calendario |
 | `dia` | `INTEGER` | Día del mes |
 | `mes` | `INTEGER` | Número del mes |
@@ -583,7 +600,7 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 
 | Columna | Tipo conceptual | Descripción |
 |---------|-----------------|-------------|
-| `sucursal_key` | `INTEGER` | Clave sustituta |
+| `sucursal_key` | `VARCHAR` | Clave sustituta: `MD5` de `id_sucursal` |
 | `id_sucursal` | `INTEGER` | Clave natural de `raw.sucursal` |
 | `nombre` | `VARCHAR` | Nombre comercial |
 | `ciudad` | `VARCHAR` | Ciudad |
@@ -593,7 +610,7 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 
 | Columna | Tipo conceptual | Descripción |
 |---------|-----------------|-------------|
-| `cliente_key` | `INTEGER` | Clave sustituta |
+| `cliente_key` | `VARCHAR` | Clave sustituta: `MD5` de `id_cliente` |
 | `id_cliente` | `INTEGER` | Clave natural de `raw.cliente` |
 | `nit` | `VARCHAR` | NIT ficticio del cliente |
 | `nombre` | `VARCHAR` | Nombre del cliente |
@@ -606,7 +623,7 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 
 | Columna | Tipo conceptual | Descripción |
 |---------|-----------------|-------------|
-| `categoria_key` | `INTEGER` | Clave sustituta |
+| `categoria_key` | `VARCHAR` | Clave sustituta: `MD5` de `id_categoria` |
 | `id_categoria` | `INTEGER` | Clave natural de `raw.categoria` |
 | `nombre` | `VARCHAR` | Nombre de la categoría |
 
@@ -614,7 +631,7 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 
 | Columna | Tipo conceptual | Descripción |
 |---------|-----------------|-------------|
-| `marca_key` | `INTEGER` | Clave sustituta |
+| `marca_key` | `VARCHAR` | Clave sustituta: `MD5` de `id_marca` |
 | `id_marca` | `INTEGER` | Clave natural de `raw.marca` |
 | `nombre` | `VARCHAR` | Nombre de la marca |
 
@@ -622,12 +639,12 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 
 | Columna | Tipo conceptual | Descripción |
 |---------|-----------------|-------------|
-| `producto_key` | `INTEGER` | Clave sustituta |
+| `producto_key` | `VARCHAR` | Clave sustituta: `MD5` de `id_producto` |
 | `id_producto` | `INTEGER` | Clave natural de `raw.producto` |
 | `sku` | `VARCHAR` | Código único del producto |
 | `nombre` | `VARCHAR` | Nombre del producto |
-| `categoria_key` | `INTEGER` | FK a `dim_categoria` |
-| `marca_key` | `INTEGER` | FK a `dim_marca` |
+| `categoria_key` | `VARCHAR` | FK a `dim_categoria` |
+| `marca_key` | `VARCHAR` | FK a `dim_marca` |
 | `unidad_medida` | `VARCHAR` | Unidad de comercialización |
 | `costo_base` | `NUMERIC(12,2)` | Costo de referencia |
 | `precio_lista` | `NUMERIC(12,2)` | Precio de lista |
@@ -637,12 +654,12 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 
 | Columna | Tipo conceptual | Descripción |
 |---------|-----------------|-------------|
-| `promocion_key` | `INTEGER` | Clave sustituta |
+| `promocion_key` | `VARCHAR` | Clave sustituta: `MD5` de `id_promocion` |
 | `id_promocion` | `INTEGER` | Clave natural de `raw.promociones` |
 | `nombre` | `VARCHAR` | Nombre de la campaña |
 | `fecha_inicio_key` | `INTEGER` | FK a `dim_fecha` para el inicio |
 | `fecha_fin_key` | `INTEGER` | FK a `dim_fecha` para el final |
-| `categoria_key` | `INTEGER` | FK a `dim_categoria` |
+| `categoria_key` | `VARCHAR` | FK a `dim_categoria` |
 | `porcentaje_descuento` | `NUMERIC(5,4)` | Descuento expresado entre 0 y 1 |
 
 ### Columnas de las tablas de hechos
@@ -653,13 +670,13 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 
 | Columna | Tipo conceptual | Descripción |
 |---------|-----------------|-------------|
-| `venta_linea_key` | `VARCHAR` | Clave sustituta o hash de la línea |
+| `venta_linea_key` | `VARCHAR` | `MD5` de `id_detalle` |
 | `id_detalle` | `BIGINT` | Clave natural de `raw.venta_detalle` |
 | `id_venta` | `BIGINT` | Identificador de la venta; dimensión degenerada |
 | `fecha_key` | `INTEGER` | FK a `dim_fecha` |
-| `cliente_key` | `INTEGER` | FK a `dim_cliente` |
-| `sucursal_key` | `INTEGER` | FK a `dim_sucursal` |
-| `producto_key` | `INTEGER` | FK a `dim_producto` |
+| `cliente_key` | `VARCHAR` | FK a `dim_cliente` |
+| `sucursal_key` | `VARCHAR` | FK a `dim_sucursal` |
+| `producto_key` | `VARCHAR` | FK a `dim_producto` |
 | `canal` | `VARCHAR` | Canal de venta |
 | `metodo_pago` | `VARCHAR` | Método de pago |
 | `estado` | `VARCHAR` | Estado de la venta |
@@ -669,6 +686,7 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 | `subtotal` | `NUMERIC(14,2)` | Importe neto registrado |
 | `importe_bruto` | `NUMERIC(14,2)` | `cantidad * precio_unitario` |
 | `importe_descuento` | `NUMERIC(14,2)` | `importe_bruto * descuento` |
+| `_loaded_at` | `TIMESTAMPTZ` | Momento de carga en `raw`; columna de control del modelo incremental |
 
 #### `fct_inventario_snapshot`
 
@@ -676,10 +694,10 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 
 | Columna | Tipo conceptual | Descripción |
 |---------|-----------------|-------------|
-| `inventario_snapshot_key` | `VARCHAR` | Clave sustituta o hash de la combinación natural |
+| `inventario_snapshot_key` | `VARCHAR` | `MD5` de fecha de corte, sucursal, producto y lote |
 | `fecha_key` | `INTEGER` | FK a `dim_fecha` |
-| `sucursal_key` | `INTEGER` | FK a `dim_sucursal` |
-| `producto_key` | `INTEGER` | FK a `dim_producto` |
+| `sucursal_key` | `VARCHAR` | FK a `dim_sucursal` |
+| `producto_key` | `VARCHAR` | FK a `dim_producto` |
 | `lote` | `VARCHAR` | Identificador del lote |
 | `fecha_vencimiento` | `DATE` | Fecha de vencimiento |
 | `stock_disponible` | `INTEGER` | Existencia disponible |
@@ -696,11 +714,11 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 
 | Columna | Tipo conceptual | Descripción |
 |---------|-----------------|-------------|
-| `devolucion_key` | `INTEGER` | Clave sustituta |
+| `devolucion_key` | `INTEGER` | Identificador de la devolución; es la clave natural |
 | `id_devolucion` | `INTEGER` | Clave natural de `raw.devoluciones` |
 | `fecha_key` | `INTEGER` | FK a `dim_fecha` |
 | `id_venta` | `BIGINT` | Venta asociada; referencia degenerada |
-| `producto_key` | `INTEGER` | FK a `dim_producto` |
+| `producto_key` | `VARCHAR` | FK a `dim_producto` |
 | `cantidad` | `INTEGER` | Cantidad devuelta |
 | `motivo` | `VARCHAR` | Motivo de la devolución |
 
@@ -710,10 +728,10 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 
 | Columna | Tipo conceptual | Descripción |
 |---------|-----------------|-------------|
-| `meta_key` | `VARCHAR` | Clave sustituta o hash de periodo y sucursal |
+| `meta_key` | `VARCHAR` | `MD5` de periodo y sucursal |
 | `periodo_key` | `INTEGER` | FK a `dim_fecha`, usando el primer día del mes |
 | `periodo` | `VARCHAR(7)` | Periodo original en formato `YYYY-MM` |
-| `sucursal_key` | `INTEGER` | FK a `dim_sucursal` |
+| `sucursal_key` | `VARCHAR` | FK a `dim_sucursal` |
 | `meta_ventas` | `NUMERIC(14,2)` | Meta monetaria |
 | `meta_unidades` | `INTEGER` | Meta de unidades |
 
@@ -723,10 +741,10 @@ Las claves sustitutas (`*_key`) se utilizan en los hechos. Las claves naturales 
 
 | Columna | Tipo conceptual | Descripción |
 |---------|-----------------|-------------|
-| `precio_proveedor_key` | `VARCHAR` | Clave sustituta o hash de la combinación natural |
+| `precio_proveedor_key` | `VARCHAR` | `MD5` de proveedor, producto y fecha de vigencia |
 | `id_proveedor` | `INTEGER` | Identificador natural del proveedor |
 | `proveedor` | `VARCHAR` | Nombre del proveedor |
-| `producto_key` | `INTEGER` | FK a `dim_producto` |
+| `producto_key` | `VARCHAR` | FK a `dim_producto` |
 | `fecha_key` | `INTEGER` | FK a `dim_fecha` |
 | `costo_proveedor` | `NUMERIC(12,2)` | Costo ofrecido por el proveedor |
 | `plazo_dias` | `INTEGER` | Tiempo de entrega en días |
@@ -747,9 +765,22 @@ fct_inventario_snapshot.fecha_key    -> dim_fecha.fecha_key
 fct_inventario_snapshot.sucursal_key -> dim_sucursal.sucursal_key
 fct_inventario_snapshot.producto_key -> dim_producto.producto_key
 
+fct_devoluciones.fecha_key    -> dim_fecha.fecha_key
+fct_devoluciones.producto_key -> dim_producto.producto_key
+
 fct_metas_ventas.periodo_key  -> dim_fecha.fecha_key
 fct_metas_ventas.sucursal_key -> dim_sucursal.sucursal_key
+
+fct_precios_proveedor.fecha_key    -> dim_fecha.fecha_key
+fct_precios_proveedor.producto_key -> dim_producto.producto_key
+
+dim_producto.categoria_key  -> dim_categoria.categoria_key
+dim_producto.marca_key      -> dim_marca.marca_key
+dim_promocion.categoria_key -> dim_categoria.categoria_key
+dim_promocion.fecha_inicio_key / fecha_fin_key -> dim_fecha.fecha_key
 ```
+
+Todas estas relaciones existen como claves foráneas físicas en el schema `marts`, y cada tabla tiene su clave primaria. El DDL extraído de la base después de una ejecución real está en [sql/ddl/referencia/03_marts_referencia.sql](sql/ddl/referencia/03_marts_referencia.sql). Es solo documentación: dbt crea las tablas y el archivo no se ejecuta al iniciar el DW.
 
 Lo que ya existe en el Data Warehouse `sgfood_dw`:
 
@@ -757,32 +788,26 @@ Lo que ya existe en el Data Warehouse `sgfood_dw`:
 |--------|------------------|---------|
 | `raw` | 12 tablas con los datos oficiales, todas las columnas de negocio como texto | DDL (`sql/ddl/`) y carga con Python |
 | `staging` | 12 vistas tipadas y limpiadas desde `raw`, con pruebas de calidad | dbt |
-| `marts` | Vacío | dbt |
+| `marts` | 12 tablas: 7 dimensiones y 5 hechos, con clave primaria y claves foráneas físicas | dbt |
 
 ## Estructura del proyecto dbt
 
-La capa `staging` ya está implementada como vistas en el schema `staging`. Estos modelos consumen las 12 fuentes declaradas en `_fuentes.yml`, convierten los valores de `TEXT` a tipos analíticos y no realizan joins.
-
 ```text
-dbt_project/models/
-├── staging/
-│   ├── _fuentes.yml
-│   ├── _staging.yml
-│   ├── stg_oltp__sucursal.sql
-│   ├── stg_oltp__categoria.sql
-│   ├── stg_oltp__marca.sql
-│   ├── stg_oltp__producto.sql
-│   ├── stg_oltp__cliente.sql
-│   ├── stg_oltp__venta.sql
-│   ├── stg_oltp__venta_detalle.sql
-│   ├── stg_archivos__inventario_bodega.sql
-│   ├── stg_archivos__proveedores_precios.sql
-│   ├── stg_archivos__devoluciones.sql
-│   ├── stg_archivos__metas_ventas.sql
-│   └── stg_archivos__promociones.sql
-├── intermediate/  # Implementado: joins y lógica reutilizable
-└── marts/         # Implementado: dimensiones y hechos
+dbt_project/
+├── dbt_project.yml, profiles.yml
+├── macros/
+│   ├── generate_schema_name.sql   # schemas exactos (staging, marts) y prefijo opcional para pruebas
+│   ├── convertir_seguro.sql       # conversiones de TEXT tolerantes
+│   ├── clave_sustituta.sql        # MD5 de la clave natural
+│   └── restricciones.sql          # claves primarias y foráneas físicas (post_hook)
+├── models/
+│   ├── staging/       # 12 vistas, una por tabla de raw; _fuentes.yml y _staging.yml
+│   ├── intermediate/  # 5 vistas con joins y lógica reutilizable, en el schema staging
+│   └── marts/         # 7 dimensiones y 5 hechos; _marts.yml con descripciones
+└── tests/             # 6 pruebas singulares de reglas de negocio
 ```
+
+La capa `staging` son vistas en el schema `staging`: consumen las 12 fuentes declaradas en `_fuentes.yml`, convierten los valores de `TEXT` a tipos analíticos y no realizan joins. Los macros están explicados en [dbt_project/README.md](dbt_project/README.md).
 
 ### Transformaciones de staging
 
@@ -799,7 +824,7 @@ dbt_project/models/
 | CSV | `stg_archivos__metas_ventas` | Validación del periodo `YYYY-MM` y conversión de metas |
 | CSV | `stg_archivos__promociones` | Conversión de IDs, fechas, categoría y descuento |
 
-Las conversiones numéricas y de fechas son tolerantes: se valida el formato antes de convertirlo. Un valor inválido se convierte en `NULL` para que sea detectado por las pruebas de calidad, en lugar de detener silenciosamente la transformación.
+Todas las conversiones pasan por el macro `convertir_seguro`, que usa `pg_input_is_valid` de PostgreSQL 16, el mismo analizador del cast. Una fecha imposible (`2026-02-30`), un mes `13` o un decimal fuera de rango se convierten en `NULL` en lugar de detener `dbt run`, y las pruebas `not_null` de las columnas obligatorias los reportan. Se conservan como condiciones explícitas el formato ISO de las fechas y la exclusión de números negativos.
 
 ### Capa intermediate
 
@@ -807,7 +832,7 @@ La capa `intermediate` se materializa como vistas en el schema `staging`. Su obj
 
 | Modelo | Propósito |
 |--------|-----------|
-| `int_ventas_linea` | Une el detalle de venta con la cabecera y calcula `importe_bruto` e `importe_descuento` |
+| `int_ventas_linea` | Une el detalle de venta con la cabecera (`LEFT JOIN`: una línea sin venta no se descarta, la reporta la prueba de relación de `staging`) y calcula `importe_bruto` e `importe_descuento` |
 | `int_inventario_snapshot` | Calcula faltantes, sobrantes y alertas de inventario |
 | `int_devoluciones` | Estandariza las devoluciones para el hecho correspondiente |
 | `int_metas_ventas` | Convierte el periodo `YYYY-MM` a una fecha mensual |
@@ -824,11 +849,35 @@ La capa `marts` se materializa como tablas en el schema `marts`. Contiene las di
 | Dimensiones | `dim_fecha`, `dim_sucursal`, `dim_cliente`, `dim_categoria`, `dim_marca`, `dim_producto`, `dim_promocion` |
 | Hechos | `fct_ventas_linea`, `fct_inventario_snapshot`, `fct_devoluciones`, `fct_metas_ventas`, `fct_precios_proveedor` |
 
-Las dimensiones se construyen con claves sustitutas `*_key` y conservan las claves naturales `id_*`. Los hechos utilizan las claves sustitutas para relacionarse con las dimensiones. `fct_ventas_linea` conserva la granularidad de una fila por detalle de venta.
+#### Claves estables
 
-`fct_ventas_linea` se materializa como `incremental` usando `id_detalle` como `unique_key`; las demás dimensiones y hechos se materializan como tablas.
+Las dimensiones generan su clave sustituta `*_key` como el `MD5` de la clave natural (macro `clave_sustituta`) y conservan la clave natural `id_*`. Así la misma entidad recibe la misma clave en cualquier ejecución, sin importar el orden ni cuántas filas existan: antes se numeraban con `ROW_NUMBER()`, y agregar un cliente con identificador menor desplazaba la clave de todos los demás. `dim_fecha` usa el entero `AAAAMMDD`, que ya es determinista. Los hechos se unen a las dimensiones por clave natural y toman la clave sustituta de la dimensión.
 
-### Materialización y pruebas de staging
+#### Hecho incremental
+
+`fct_ventas_linea` se materializa como `incremental` con `id_detalle` como `unique_key`; las demás dimensiones y hechos son tablas. Con `unique_key`, dbt-postgres 1.11 usa la estrategia `delete+insert`: cuando una fila cambia en la fuente (por ejemplo una venta que pasa de `PENDIENTE` a `ANULADA`), la fila del hecho se reemplaza. El filtro compara `_loaded_at` con el máximo ya cargado.
+
+La ingesta trunca y recarga `raw` en cada ejecución, así que todas las filas llegan con un `_loaded_at` nuevo y el incremental las reprocesa todas. El resultado es correcto; la ventaja de rendimiento aparecería con una ingesta incremental. Una línea eliminada en la fuente no se elimina del hecho; la fuente no elimina líneas.
+
+#### Restricciones físicas
+
+Cada tabla de `marts` tiene clave primaria y cada clave foránea de los hechos existe como restricción. Se crean con `post_hook` (macros `clave_primaria` y `clave_foranea`), que las eliminan y las vuelven a crear en cada ejecución: cuando dbt reconstruye una dimensión, sus claves foráneas se eliminan en cascada y los hechos, que se construyen después, las restablecen. Las claves foráneas admiten `NULL`; la prueba `not_null` reporta, por ejemplo, una venta cuyo cliente no se encontró.
+
+#### Regla de ingresos
+
+Los ingresos son los de las ventas con estado `COMPLETADA`. Una venta anulada o pendiente no es ingreso. [02_ventas_por_sucursal.sql](sql/validaciones/02_ventas_por_sucursal.sql) y [03_metas_vs_ventas.sql](sql/validaciones/03_metas_vs_ventas.sql) aplican esa regla, y la primera muestra aparte las ventas anuladas y pendientes que quedaron fuera.
+
+Importe de `fct_ventas_linea` por estado en la última ejecución ([ingresos_por_estado.txt](evidencia/ingresos_por_estado.txt)):
+
+| Estado | Ventas | Líneas | Importe |
+|--------|--------|--------|---------|
+| `COMPLETADA` | 1129 | 3014 | 780201.72 |
+| `ANULADA` | 48 | 139 | 41769.16 |
+| `PENDIENTE` | 23 | 56 | 16481.19 |
+
+Los ingresos son los 780201.72 de las ventas completadas. La suma de `ingresos` de las seis sucursales en [validacion_02_ventas_por_sucursal.txt](evidencia/validacion_02_ventas_por_sucursal.txt) coincide con ese importe.
+
+### Materialización y pruebas
 
 La configuración en [dbt_project.yml](dbt_project/dbt_project.yml) define:
 
@@ -836,13 +885,51 @@ La configuración en [dbt_project.yml](dbt_project/dbt_project.yml) define:
 staging:
   +schema: staging
   +materialized: view
+intermediate:
+  +schema: staging
+  +materialized: view
+marts:
+  +schema: marts
+  +materialized: table
 ```
 
-Las pruebas se encuentran en [models/staging/_staging.yml](dbt_project/models/staging/_staging.yml) e incluyen:
+Pruebas dbt:
 
-- `unique` y `not_null` para identificadores.
-- `not_null` para campos obligatorios.
-- `accepted_values` para `activo`, `canal`, `metodo_pago` y `estado`.
+| Dónde | Pruebas |
+|-------|---------|
+| `marts` | `unique` y `not_null` en toda clave sustituta; `relationships` en toda clave foránea de los hechos y de `dim_promocion`; `accepted_values` en `canal`, `metodo_pago`, `estado`, `tipo_cliente`, `motivo` y `activo` |
+| `staging` | `not_null` en toda columna obligatoria del contrato raw; `relationships` de `venta_detalle.id_venta` hacia `venta`, y de `venta.id_cliente` y `venta.id_sucursal` hacia sus tablas; `unique` en identificadores |
+| Singulares | `assert_ventas_subtotal_consistente`, `assert_ventas_cantidad_positiva`, `assert_ventas_descuento_en_rango`, `assert_inventario_vencimiento_posterior_al_corte`, `assert_metas_positivas` y `assert_devolucion_no_supera_venta` |
+
+Las pruebas están en [_staging.yml](dbt_project/models/staging/_staging.yml), [_intermediate.yml](dbt_project/models/intermediate/_intermediate.yml), [_marts.yml](dbt_project/models/marts/_marts.yml) y [dbt_project/tests/](dbt_project/tests/). Cada modelo y cada columna de `marts` tiene descripción en `_marts.yml`.
+
+### Casos de calidad
+
+Los 10 casos de `casos_calidad_opcionales.csv` no se cargan en la corrida principal (decisión D8), porque alterarían las cifras reales. Para demostrar que las pruebas dbt los detectan, el script [cargar_casos_calidad.py](sql/calidad/cargar_casos_calidad.py) crea el schema `raw_calidad` como copia de `raw` y aplica cada caso a una fila distinta de la tabla que le corresponde. Las fuentes de dbt leen del schema que indica la variable `schema_raw` (por defecto `raw`) y la variable `prefijo_schema` envía los modelos a `cierre_staging` y `cierre_marts`, de modo que `staging` y `marts` no se tocan:
+
+```bash
+docker compose exec -T airflow-scheduler python /opt/airflow/sql/calidad/cargar_casos_calidad.py
+docker compose exec -T airflow-scheduler /opt/dbt-venv/bin/dbt run  --project-dir /opt/airflow/dbt_project --profiles-dir /opt/airflow/dbt_project --vars '{schema_raw: raw_calidad, prefijo_schema: cierre_}'
+docker compose exec -T airflow-scheduler /opt/dbt-venv/bin/dbt test --project-dir /opt/airflow/dbt_project --profiles-dir /opt/airflow/dbt_project --vars '{schema_raw: raw_calidad, prefijo_schema: cierre_}'
+docker compose exec -T airflow-scheduler python /opt/airflow/sql/calidad/cargar_casos_calidad.py --limpiar
+```
+
+Resultado de la última ejecución ([casos_calidad_resultado.txt](evidencia/casos_calidad_resultado.txt)): `dbt run` termina sin errores sobre la copia y 13 de las 194 pruebas fallan. Los 10 casos del catálogo aplican a una tabla de `raw` (la entidad `inventario` corresponde a `inventario_bodega`) y cada uno hace fallar al menos una prueba:
+
+| Caso | Prueba dbt que falla |
+|------|----------------------|
+| `cliente.id_cliente` vacío | `not_null_stg_oltp__cliente_id_cliente` y `not_null_dim_cliente_id_cliente` |
+| `producto.precio_lista` negativo | `not_null_stg_oltp__producto_precio_lista` |
+| `venta.id_cliente` huérfano | `relationships_stg_oltp__venta_id_cliente...` y `not_null_fct_ventas_linea_cliente_key` |
+| `venta_detalle.cantidad` en cero | `assert_ventas_cantidad_positiva` |
+| `venta_detalle.descuento` de 1.20 | `assert_ventas_descuento_en_rango` |
+| `inventario.stock_disponible` negativo | `not_null_stg_archivos__inventario_bodega_stock_disponible` |
+| `inventario.fecha_vencimiento` anterior al corte | `assert_inventario_vencimiento_posterior_al_corte` |
+| `proveedores_precios.costo_proveedor` vacío | `not_null_stg_archivos__proveedores_precios_costo_proveedor` |
+| `metas_ventas.meta_ventas` en cero | `assert_metas_positivas` |
+| `devoluciones.cantidad` de 99 | `assert_devolucion_no_supera_venta` |
+
+Los casos de valor negativo o vacío se detectan con `not_null` porque `staging` deja esos valores en `NULL`; los de rango (cantidad en cero, descuento mayor que 1, meta en cero, vencimiento anterior al corte, devolución mayor que lo vendido) los detectan las pruebas singulares. `assert_ventas_subtotal_consistente` también falla con los casos de cantidad y de descuento.
 
 ### Validación de la capa staging
 
@@ -873,7 +960,7 @@ docker compose exec airflow-scheduler `
   --select path:models/staging
 ```
 
-`dbt build` ejecuta los modelos y sus pruebas. La validación se considera exitosa cuando los 12 modelos compilan y las pruebas finalizan con estado `PASS`.
+`dbt build` ejecuta los modelos y sus pruebas. Un selector `path:` ejecuta solo los modelos de esa carpeta, no sus dependencias. La validación se considera exitosa cuando los 12 modelos compilan y las pruebas finalizan con estado `PASS`.
 
 El punto de partida está en la sección 9 y en [dbt_project/README.md](dbt_project/README.md).
 
@@ -883,13 +970,13 @@ Las consultas analíticas se encuentran en [sql/validaciones/](sql/validaciones/
 
 | Archivo | Tipo | Propósito |
 |---------|------|-----------|
-| `01_conteos_marts.sql` | Analítica | Conteo de dimensiones y hechos |
-| `02_ventas_por_sucursal.sql` | Analítica | Ventas, unidades e ingresos por sucursal |
-| `03_metas_vs_ventas.sql` | Analítica | Comparación de ventas reales contra metas |
-| `dag/01_integridad_referencial_marts.sql` | Control de pipeline | Detecta hechos sin dimensión relacionada |
-| `dag/02_reglas_negocio_marts.sql` | Control de pipeline | Detecta cantidades o stocks inválidos |
+| `01_conteos_marts.sql` | Analítica | Conteo de las 12 tablas de `marts` |
+| `02_ventas_por_sucursal.sql` | Analítica | Ventas, unidades e ingresos de ventas `COMPLETADA` por sucursal, más las ventas anuladas y pendientes |
+| `03_metas_vs_ventas.sql` | Analítica | Comparación de ventas reales (solo `COMPLETADA`) contra metas |
+| `dag/01_integridad_referencial_marts.sql` | Control de pipeline | Detecta, en los cinco hechos, claves foráneas (incluidas las de fecha) sin dimensión relacionada o vacías |
+| `dag/02_reglas_negocio_marts.sql` | Control de pipeline | Detecta medidas nulas, cantidades en cero, descuentos fuera de 0 a 1 y mínimos de stock mayores que el máximo |
 
-La prueba personalizada de dbt [assert_ventas_subtotal_consistente.sql](dbt_project/tests/assert_ventas_subtotal_consistente.sql) valida que el subtotal sea consistente con el importe bruto y el descuento.
+Las pruebas singulares de dbt están en [dbt_project/tests/](dbt_project/tests/); por ejemplo, [assert_ventas_subtotal_consistente.sql](dbt_project/tests/assert_ventas_subtotal_consistente.sql) valida que el subtotal sea consistente con el importe bruto y el descuento.
 
 Validaciones que ya ejecuta el pipeline:
 
@@ -927,31 +1014,40 @@ Decisiones de la ingesta y la orquestación:
 | `dbt run` y `dbt test` como tareas separadas | Un fallo de modelo y uno de calidad de datos quedan distinguidos |
 | dbt en un entorno virtual aislado | Evita conflictos de dependencias con Airflow |
 | Validaciones finales como archivos SQL | Se agregan validaciones sin modificar el DAG |
+| Claves sustitutas como `MD5` de la clave natural | La misma entidad tiene la misma clave en cualquier ejecución; con `ROW_NUMBER()` una entidad nueva desplazaba las claves existentes |
+| Conversiones con `pg_input_is_valid` | Usa el mismo analizador del cast: detecta fechas imposibles y desbordes sin reimplementar reglas con expresiones regulares |
+| Hecho incremental con `unique_key` y filtro por `_loaded_at` | Sigue siendo incremental y una fila que cambia en la fuente se reemplaza |
+| Restricciones físicas con `post_hook` | Resuelven claves primarias y foráneas sin declarar el tipo de cada columna de cada modelo, como obligarían los contratos de dbt |
+| Ingresos solo de ventas `COMPLETADA` | Una venta anulada o pendiente no es ingreso |
+| Casos de calidad sobre una copia de `raw` | Demuestran las pruebas sin alterar las cifras de la corrida principal |
+| pgAdmin con perfil de Compose | Es opcional: no arranca con `docker compose up` |
 
 ## Evidencia de ejecución
 
 Los archivos están en [evidencia/](evidencia/).
+
+Se generaron en una ejecución del DAG `sgfood_elt` sobre un entorno recién creado (`docker compose down -v` y `docker compose up -d`): las 17 tareas terminaron en `success`.
 
 | Archivo | Contenido |
 |---------|-----------|
 | `carga_completa.txt` | Registro de una carga completa a `raw` |
 | `conteo_tablas_raw.txt` | Filas por tabla de `raw` y total |
 | `dag_tareas_y_dependencias.txt` | Tareas del DAG y sus dependencias |
-| `dag_estados_tareas.txt` | Estado de cada tarea en una ejecución completa |
-| `dag_log_dbt_run.txt`, `dag_log_dbt_test.txt`, `dag_log_validar_marts.txt` | Registros de las tareas de dbt y de validación |
-| `dbt_run_ejecucion_real.txt` | Ejecución de dbt sobre el esqueleto del proyecto |
-| `dbt_run_actual.txt` | Ejecución actual de los 29 modelos dbt: 17 vistas, 11 tablas y 1 incremental |
-| `dbt_test_actual.txt` | Ejecución actual de las 154 pruebas dbt, todas aprobadas |
-| `dbt_docs_generate_actual.txt` | Generación actual del catálogo y la documentación dbt |
-| `validacion_01_conteos_marts_actual.txt` | Conteos actuales de dimensiones y hechos en `marts` |
-| `validacion_02_ventas_sucursal_actual.txt` | Resultados actuales de ventas agrupadas por sucursal |
-| `validacion_03_metas_vs_ventas_actual.txt` | Comparación actual de metas contra ventas reales |
-| `validacion_dag_01_actual.txt` | Integridad referencial de los hechos hacia sus dimensiones; resultado: 0 filas |
-| `validacion_dag_02_actual.txt` | Reglas de negocio de ventas, inventario y devoluciones; resultado: 0 filas |
+| `dag_estados_tareas.txt` | Estado de las 17 tareas de la ejecución limpia |
+| `dag_log_dbt_run.txt`, `dag_log_dbt_test.txt`, `dag_log_validar_marts.txt` | Registros reales de las tareas del DAG: `dbt run` (29 modelos: 17 vistas, 11 tablas y 1 incremental), `dbt test` (194 pruebas, todas aprobadas) y las validaciones finales |
+| `dbt_docs_generate.txt` | Generación del catálogo y la documentación dbt |
+| `marts_conteos.txt` | Filas por tabla de `marts` |
+| `marts_restricciones.txt` | Las 12 claves primarias y las 18 claves foráneas del schema `marts` |
+| `ingresos_por_estado.txt` | Ventas, líneas e importe por estado de la venta |
+| `casos_calidad_resultado.txt` | Pruebas dbt que fallan con cada caso de calidad |
+| `validacion_01_conteos_marts.txt`, `validacion_02_ventas_por_sucursal.txt`, `validacion_03_metas_vs_ventas.txt` | Resultado de las consultas analíticas con la regla de ingresos |
+| `validacion_dag_01.txt`, `validacion_dag_02.txt` | Validaciones finales del DAG; resultado: 0 filas |
 | `dag_grafo.png` | Grafo del DAG `sgfood_elt` en la interfaz de Airflow |
-| `dag_ejecucion_exitosa.png` | Ejecución completa con las 17 tareas en estado exitoso |
-| `dag_ejecucion_actual.png` | Evidencia visual de la ejecución actual del DAG |
+| `dag_ejecucion_exitosa.png` | Ejecución completa con las 17 tareas en estado exitoso (2026-10-10) |
+| `dag_ejecucion_actual.png` | Captura de la interfaz de Airflow agregada por el Rol B el 2026-10-13, previa a los ajustes de cierre |
 | `dag_fallo_controlado.png` | Ejecución detenida por una validación final que no se cumple |
+
+Las capturas de Airflow se conservan: el DAG sigue teniendo 17 tareas y el mismo resultado, y ninguna captura muestra el contenido de los modelos. Si se quiere una captura que corresponda a la ejecución limpia de `dag_estados_tareas.txt`, debe tomarla un integrante desde la interfaz de Airflow.
 
 ### Grafo del DAG
 
@@ -965,15 +1061,17 @@ Las validaciones finales que detienen el pipeline se encuentran en
 [sql/validaciones/dag/](sql/validaciones/dag/). Cada consulta debe devolver cero
 filas para considerar consistentes los datos:
 
-- `01_integridad_referencial_marts.sql` verifica que las claves de fecha,
-  cliente, sucursal y producto de los hechos existan en sus dimensiones.
-- `02_reglas_negocio_marts.sql` verifica cantidades y subtotales positivos, así
-  como valores de inventario no negativos.
+- `01_integridad_referencial_marts.sql` verifica que las claves de fecha, cliente,
+  sucursal y producto de los cinco hechos existan en sus dimensiones.
+- `02_reglas_negocio_marts.sql` verifica lo que puede ocurrir con los datos
+  tipados: medidas nulas, cantidades en cero, descuentos fuera de 0 a 1 y mínimos
+  de stock mayores que el máximo. Los valores negativos no se buscan porque
+  `staging` los deja en `NULL`.
 
-La evidencia actual confirma que ambas consultas devolvieron `(0 rows)`:
+La evidencia confirma que ambas consultas devolvieron `(0 rows)`:
 
-- [validacion_dag_01_actual.txt](evidencia/validacion_dag_01_actual.txt)
-- [validacion_dag_02_actual.txt](evidencia/validacion_dag_02_actual.txt)
+- [validacion_dag_01.txt](evidencia/validacion_dag_01.txt)
+- [validacion_dag_02.txt](evidencia/validacion_dag_02.txt)
 
 ### Ejecución exitosa
 
@@ -981,9 +1079,9 @@ Ejecución manual del 2026-10-10 con los parámetros predeterminados: las 17 ins
 
 ![Ejecución del DAG sgfood_elt con las 17 tareas en estado exitoso](evidencia/dag_ejecucion_exitosa.png)
 
-### Ejecución actual
+### Ejecución con el proyecto dbt del Rol B
 
-La siguiente imagen corresponde a la ejecución actual del DAG `sgfood_elt`:
+La siguiente imagen es la captura que agregó el Rol B el 2026-10-13, previa a los ajustes de cierre:
 
 ![Ejecución actual del DAG sgfood_elt](evidencia/dag_ejecucion_actual.png)
 
@@ -993,7 +1091,8 @@ Ejecución de prueba con una carpeta de validaciones cuyas consultas devuelven f
 
 ![Tarea validar_marts fallida con el registro de la validación incumplida](evidencia/dag_fallo_controlado.png)
 
-La evidencia de ejecución de Rol B conserva los resultados actuales de `dbt run`,
-`dbt test`, `dbt docs generate`, las consultas analíticas y las validaciones
-finales de [sql/validaciones/](sql/validaciones/). Los comandos reproducibles
-están documentados en [dbt_project/README.md](dbt_project/README.md).
+La evidencia de dbt, de las consultas analíticas y de las validaciones finales de
+[sql/validaciones/](sql/validaciones/) proviene de la ejecución limpia del DAG descrita
+arriba. Los comandos reproducibles están documentados en
+[dbt_project/README.md](dbt_project/README.md), y los cambios de los ajustes de cierre,
+en [docs/cambios_ajustes_cierre.md](docs/cambios_ajustes_cierre.md).

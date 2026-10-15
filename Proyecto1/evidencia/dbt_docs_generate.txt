@@ -1,8 +1,8 @@
-02:32:15  Running with dbt=1.12.5
-02:32:16  Registered adapter: postgres=1.11.0
-02:32:17  Found 29 models, 194 data tests, 12 sources, 482 macros
-02:32:17  
-02:32:17  Concurrency: 4 threads (target='dev')
-02:32:17  
-02:32:23  Building catalog
-02:32:23  Catalog written to /opt/airflow/dbt_project/target/catalog.json
+02:55:56  Running with dbt=1.12.5
+02:55:57  Registered adapter: postgres=1.11.0
+02:55:59  Found 29 models, 194 data tests, 12 sources, 482 macros
+02:55:59  
+02:55:59  Concurrency: 4 threads (target='dev')
+02:55:59  
+02:56:06  Building catalog
+02:56:06  Catalog written to /opt/airflow/dbt_project/target/catalog.json
