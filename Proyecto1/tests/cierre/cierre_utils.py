@@ -124,3 +124,15 @@ def resumen(res, maximo=12):
     claves = ("ERROR", "FAIL", "Error", "Done.", "out of range", "invalid input")
     lineas = [l.strip() for l in (res.stdout + res.stderr).splitlines() if any(k in l for k in claves)]
     return "\n".join(lineas[:maximo])
+
+
+def recargar_tabla_raw(tabla):
+    """Recarga una tabla de raw desde su fuente con la CLI de ingesta (como hace el DAG)."""
+    res = _compose("exec", "-T", "airflow-scheduler", "python", "-m", "sgfood_ingesta", "--tabla", tabla)
+    assert res.returncode == 0, f"la ingesta de {tabla} fallo:\n{res.stdout[-500:]}\n{res.stderr[-500:]}"
+
+
+def dbt_run_ok(variables=None, full_refresh=False):
+    res = dbt("run", variables, extra=("--full-refresh",) if full_refresh else ())
+    assert res.returncode == 0, f"dbt run fallo:\n{resumen(res)}"
+    return res

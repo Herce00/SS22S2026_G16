@@ -1,5 +1,5 @@
 SELECT
-    ROW_NUMBER() OVER (ORDER BY id_cliente)::INTEGER AS cliente_key,
+    {{ clave_sustituta(['id_cliente']) }} AS cliente_key,
     id_cliente,
     nit,
     nombre,

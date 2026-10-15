@@ -1,5 +1,5 @@
 SELECT
-    ROW_NUMBER() OVER (ORDER BY p.id_producto)::INTEGER AS producto_key,
+    {{ clave_sustituta(['p.id_producto']) }} AS producto_key,
     p.id_producto,
     p.sku,
     p.nombre,

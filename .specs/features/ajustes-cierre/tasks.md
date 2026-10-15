@@ -69,12 +69,12 @@ Sin código. Cada respuesta se anota en "Puntos abiertos" de [design.md](design.
 
 ## T4 — Claves sustitutas estables
 
-- [ ] **Rojo (integración):** `tests/cierre/test_claves_estables.py`:
+- [x] **Rojo (integración):** `tests/cierre/test_claves_estables.py`:
   - Dos ejecuciones seguidas dejan las mismas claves en cada dimensión.
   - Tras agregar en la base fuente un cliente con identificador 0 y ejecutar de nuevo, la clave de cada uno de los 250 clientes existentes no cambia y cada línea de `fct_ventas_linea` apunta al mismo cliente.
   - La prueba elimina el cliente 0 y vuelve a ejecutar al terminar.
-- [ ] **Verde:** crear `macros/clave_sustituta.sql` y usarlo en las seis dimensiones con `ROW_NUMBER()`.
-- [ ] Revisar las consultas de `sql/validaciones/` que usan claves.
+- [x] **Verde:** crear `macros/clave_sustituta.sql` y usarlo en las seis dimensiones con `ROW_NUMBER()`.
+- [x] Revisar las consultas de `sql/validaciones/` que usan claves.
 
 **Verificación:** `pytest tests/cierre -k "claves_estables"`.
 **Commit:** `fix(p1-dbt): derive dimension surrogate keys from natural keys`

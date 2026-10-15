@@ -1,5 +1,5 @@
 SELECT
-    ROW_NUMBER() OVER (ORDER BY p.id_promocion)::INTEGER AS promocion_key,
+    {{ clave_sustituta(['p.id_promocion']) }} AS promocion_key,
     p.id_promocion,
     p.nombre,
     TO_CHAR(p.fecha_inicio, 'YYYYMMDD')::INTEGER AS fecha_inicio_key,

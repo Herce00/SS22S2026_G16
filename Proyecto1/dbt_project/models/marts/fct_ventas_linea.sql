@@ -5,7 +5,7 @@
 ) }}
 
 SELECT
-    MD5(v.id_detalle::TEXT) AS venta_linea_key,
+    {{ clave_sustituta(['v.id_detalle']) }} AS venta_linea_key,
     v.id_detalle,
     v.id_venta,
     TO_CHAR(v.fecha, 'YYYYMMDD')::INTEGER AS fecha_key,
