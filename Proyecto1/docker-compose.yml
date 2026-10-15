@@ -179,22 +179,23 @@ services:
       start_period: 30s
     restart: unless-stopped
 
-  pgAdmin:
-    image: dpage/pgadmin4
-    container_name: pgadmin4
-    restart: unless-stopped
+  # Herramienta opcional: no arranca con "docker compose up". Para usarla:
+  #   docker compose --profile herramientas up -d pgadmin
+  # PGADMIN_PASSWORD debe definirse en .env; sin ella pgAdmin no inicia.
+  pgadmin:
+    image: dpage/pgadmin4:9.18.0
+    container_name: sgfood_pgadmin
+    profiles: ["herramientas"]
     depends_on:
-      - dw
+      dw:
+        condition: service_healthy
     ports:
-      - "8081:80"
+      - "${PGADMIN_PORT:-8081}:80"
     environment:
-      PGADMIN_DEFAULT_EMAIL: herce@google.com
-      PGADMIN_DEFAULT_PASSWORD: 123456
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-pgadmin@example.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-}
     volumes:
       - pgadmin_data:/var/lib/pgadmin
-      - pgadmin_data:/certs/server.cert
-      - pgadmin_data:/certs/server.key
-      - pgadmin_data:/pgadmin4/servers.json
 
 volumes:
   dw_data:

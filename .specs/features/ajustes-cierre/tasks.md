@@ -132,10 +132,10 @@ Sin código. Cada respuesta se anota en "Puntos abiertos" de [design.md](design.
 
 ## T10 — pgAdmin
 
-- [ ] **Rojo (estática):** `tests/cierre/test_pgadmin.py` y la prueba existente de imágenes: ninguna imagen sin versión fija; pgAdmin tiene perfil `herramientas`; sus credenciales y su puerto salen de variables; un único volumen montado en `/var/lib/pgadmin`; `.env.example` contiene las variables nuevas con valores no personales.
-- [ ] **Rojo (integración):** `docker compose up -d` no inicia pgAdmin.
-- [ ] **Verde:** aplicar C8 de [design.md](design.md).
-- [ ] Iniciar pgAdmin con el perfil y comprobar que responde en su puerto.
+- [x] **Rojo (estática):** `tests/cierre/test_pgadmin.py` y la prueba existente de imágenes: ninguna imagen sin versión fija; pgAdmin tiene perfil `herramientas`; sus credenciales y su puerto salen de variables; un único volumen montado en `/var/lib/pgadmin`; `.env.example` contiene las variables nuevas con valores no personales.
+- [x] **Rojo (integración):** `docker compose up -d` no inicia pgAdmin.
+- [x] **Verde:** aplicar C8 de [design.md](design.md).
+- [x] Iniciar pgAdmin con el perfil y comprobar que responde en su puerto.
 
 **Verificación:** `pytest tests/cierre -k "pgadmin"` y `pytest tests/entorno`.
 **Commit:** `fix(p1-entorno): pin pgadmin and read its settings from env`
