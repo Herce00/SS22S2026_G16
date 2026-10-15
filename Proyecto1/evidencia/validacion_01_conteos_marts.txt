@@ -1,0 +1,16 @@
+          tabla          | filas 
+-------------------------+-------
+ dim_fecha               |   974
+ dim_sucursal            |     6
+ dim_categoria           |     8
+ dim_marca               |    10
+ dim_producto            |    80
+ dim_cliente             |   250
+ dim_promocion           |    30
+ fct_ventas_linea        |  3209
+ fct_inventario_snapshot |  3840
+ fct_devoluciones        |    80
+ fct_metas_ventas        |    48
+ fct_precios_proveedor   |   103
+(12 rows)
+

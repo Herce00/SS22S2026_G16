@@ -1,20 +1,19 @@
 dag_id     | logical_date | task_id                              | state   | start_date                       | end_date                        
 ===========+==============+======================================+=========+==================================+=================================
-sgfood_elt |              | validar_carga_raw                    | success | 2026-10-10T05:24:14.072151+00:00 | 2026-10-10T05:24:14.354673+00:00
-sgfood_elt |              | dbt_run                              | success | 2026-10-10T05:24:16.474722+00:00 | 2026-10-10T05:24:21.738593+00:00
-sgfood_elt |              | validar_marts                        | success | 2026-10-10T05:24:26.266454+00:00 | 2026-10-10T05:24:26.460983+00:00
-sgfood_elt |              | carga_raw.cargar_venta               | success | 2026-10-10T05:24:11.910800+00:00 | 2026-10-10T05:24:12.225322+00:00
-sgfood_elt |              | carga_raw.cargar_venta_detalle       | success | 2026-10-10T05:24:11.910511+00:00 | 2026-10-10T05:24:12.234945+00:00
-sgfood_elt |              | carga_raw.cargar_inventario_bodega   | success | 2026-10-10T05:24:11.910555+00:00 | 2026-10-10T05:24:12.245856+00:00
-sgfood_elt |              | carga_raw.cargar_categoria           | success | 2026-10-10T05:24:10.809918+00:00 | 2026-10-10T05:24:11.128797+00:00
-sgfood_elt |              | carga_raw.cargar_marca               | success | 2026-10-10T05:24:10.815155+00:00 | 2026-10-10T05:24:11.129623+00:00
-sgfood_elt |              | carga_raw.cargar_sucursal            | success | 2026-10-10T05:24:10.805064+00:00 | 2026-10-10T05:24:11.147047+00:00
-sgfood_elt |              | carga_raw.cargar_producto            | success | 2026-10-10T05:24:10.806106+00:00 | 2026-10-10T05:24:11.129727+00:00
-sgfood_elt |              | carga_raw.cargar_cliente             | success | 2026-10-10T05:24:11.910638+00:00 | 2026-10-10T05:24:12.207654+00:00
-sgfood_elt |              | carga_raw.cargar_devoluciones        | success | 2026-10-10T05:24:13.011488+00:00 | 2026-10-10T05:24:13.315435+00:00
-sgfood_elt |              | carga_raw.cargar_proveedores_precios | success | 2026-10-10T05:24:13.011575+00:00 | 2026-10-10T05:24:13.326684+00:00
-sgfood_elt |              | carga_raw.cargar_metas_ventas        | success | 2026-10-10T05:24:13.014330+00:00 | 2026-10-10T05:24:13.327115+00:00
-sgfood_elt |              | carga_raw.cargar_promociones         | success | 2026-10-10T05:24:13.011103+00:00 | 2026-10-10T05:24:13.320273+00:00
-sgfood_elt |              | dbt_deps                             | success | 2026-10-10T05:24:15.239426+00:00 | 2026-10-10T05:24:15.618606+00:00
-sgfood_elt |              | dbt_test                             | success | 2026-10-10T05:24:21.882909+00:00 | 2026-10-10T05:24:25.860428+00:00
-                                                                                                                                                
+sgfood_elt |              | carga_raw.cargar_cliente             | success | 2026-10-15T02:26:36.249772+00:00 | 2026-10-15T02:26:36.938612+00:00
+sgfood_elt |              | carga_raw.cargar_producto            | success | 2026-10-15T02:26:36.247985+00:00 | 2026-10-15T02:26:36.963075+00:00
+sgfood_elt |              | carga_raw.cargar_venta               | success | 2026-10-15T02:26:36.270869+00:00 | 2026-10-15T02:26:36.993455+00:00
+sgfood_elt |              | carga_raw.cargar_venta_detalle       | success | 2026-10-15T02:26:36.268376+00:00 | 2026-10-15T02:26:37.011976+00:00
+sgfood_elt |              | carga_raw.cargar_sucursal            | success | 2026-10-15T02:26:37.565735+00:00 | 2026-10-15T02:26:38.544385+00:00
+sgfood_elt |              | carga_raw.cargar_categoria           | success | 2026-10-15T02:26:37.612266+00:00 | 2026-10-15T02:26:38.692927+00:00
+sgfood_elt |              | carga_raw.cargar_marca               | success | 2026-10-15T02:26:37.637526+00:00 | 2026-10-15T02:26:38.803588+00:00
+sgfood_elt |              | dbt_test                             | success | 2026-10-15T02:26:59.663997+00:00 | 2026-10-15T02:27:18.143399+00:00
+sgfood_elt |              | validar_marts                        | success | 2026-10-15T02:27:18.993694+00:00 | 2026-10-15T02:27:19.528757+00:00
+sgfood_elt |              | carga_raw.cargar_inventario_bodega   | success | 2026-10-15T02:26:37.540655+00:00 | 2026-10-15T02:26:38.891324+00:00
+sgfood_elt |              | carga_raw.cargar_devoluciones        | success | 2026-10-15T02:26:40.072850+00:00 | 2026-10-15T02:26:40.884942+00:00
+sgfood_elt |              | carga_raw.cargar_promociones         | success | 2026-10-15T02:26:40.125963+00:00 | 2026-10-15T02:26:40.945780+00:00
+sgfood_elt |              | carga_raw.cargar_proveedores_precios | success | 2026-10-15T02:26:39.980307+00:00 | 2026-10-15T02:26:40.950990+00:00
+sgfood_elt |              | carga_raw.cargar_metas_ventas        | success | 2026-10-15T02:26:40.116617+00:00 | 2026-10-15T02:26:41.028153+00:00
+sgfood_elt |              | validar_carga_raw                    | success | 2026-10-15T02:26:42.628389+00:00 | 2026-10-15T02:26:43.737143+00:00
+sgfood_elt |              | dbt_deps                             | success | 2026-10-15T02:26:44.994455+00:00 | 2026-10-15T02:26:45.488365+00:00
+sgfood_elt |              | dbt_run                              | success | 2026-10-15T02:26:46.093427+00:00 | 2026-10-15T02:26:58.773984+00:00

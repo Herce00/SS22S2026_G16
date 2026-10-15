@@ -142,12 +142,12 @@ Sin código. Cada respuesta se anota en "Puntos abiertos" de [design.md](design.
 
 ## T11 — Arranque limpio y evidencia
 
-- [ ] `docker compose down -v` y `docker compose up -d`.
-- [ ] Ejecutar el DAG y esperar el resultado: las 17 tareas en `success`.
-- [ ] Ejecutar la suite completa: `pytest tests/entorno tests/contrato tests/ingesta tests/dag tests/cierre`, y la prueba lenta de forma explícita.
-- [ ] Regenerar en `evidencia/` los archivos de [design.md](design.md) desde esa ejecución, como `.txt`.
-- [ ] Quitar los archivos de evidencia generados a mano que queden reemplazados.
-- [ ] Revisar que ningún archivo de evidencia contenga credenciales.
+- [x] `docker compose down -v` y `docker compose up -d`.
+- [x] Ejecutar el DAG y esperar el resultado: las 17 tareas en `success`.
+- [x] Ejecutar la suite completa: `pytest tests/entorno tests/contrato tests/ingesta tests/dag tests/cierre`, y la prueba lenta de forma explícita.
+- [x] Regenerar en `evidencia/` los archivos de [design.md](design.md) desde esa ejecución, como `.txt`.
+- [x] Quitar los archivos de evidencia generados a mano que queden reemplazados.
+- [x] Revisar que ningún archivo de evidencia contenga credenciales.
 
 **Verificación:** suite completa en verde en un entorno limpio; evidencia versionada.
 **Commit:** `docs(p1): regenerate evidence from a clean dag run`

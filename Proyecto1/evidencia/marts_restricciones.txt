@@ -1,0 +1,40 @@
+ tipo |          tabla          |               restriccion               |                                definicion                                 
+------+-------------------------+-----------------------------------------+---------------------------------------------------------------------------
+ p    | dim_categoria           | pk_dim_categoria                        | PRIMARY KEY (categoria_key)
+ p    | dim_cliente             | pk_dim_cliente                          | PRIMARY KEY (cliente_key)
+ p    | dim_fecha               | pk_dim_fecha                            | PRIMARY KEY (fecha_key)
+ p    | dim_marca               | pk_dim_marca                            | PRIMARY KEY (marca_key)
+ p    | dim_producto            | pk_dim_producto                         | PRIMARY KEY (producto_key)
+ p    | dim_promocion           | pk_dim_promocion                        | PRIMARY KEY (promocion_key)
+ p    | dim_sucursal            | pk_dim_sucursal                         | PRIMARY KEY (sucursal_key)
+ p    | fct_devoluciones        | pk_fct_devoluciones                     | PRIMARY KEY (devolucion_key)
+ p    | fct_inventario_snapshot | pk_fct_inventario_snapshot              | PRIMARY KEY (inventario_snapshot_key)
+ p    | fct_metas_ventas        | pk_fct_metas_ventas                     | PRIMARY KEY (meta_key)
+ p    | fct_precios_proveedor   | pk_fct_precios_proveedor                | PRIMARY KEY (precio_proveedor_key)
+ p    | fct_ventas_linea        | pk_fct_ventas_linea                     | PRIMARY KEY (venta_linea_key)
+ f    | dim_producto            | fk_dim_producto_categoria_key           | FOREIGN KEY (categoria_key) REFERENCES marts.dim_categoria(categoria_key)
+ f    | dim_producto            | fk_dim_producto_marca_key               | FOREIGN KEY (marca_key) REFERENCES marts.dim_marca(marca_key)
+ f    | dim_promocion           | fk_dim_promocion_categoria_key          | FOREIGN KEY (categoria_key) REFERENCES marts.dim_categoria(categoria_key)
+ f    | dim_promocion           | fk_dim_promocion_fecha_fin_key          | FOREIGN KEY (fecha_fin_key) REFERENCES marts.dim_fecha(fecha_key)
+ f    | dim_promocion           | fk_dim_promocion_fecha_inicio_key       | FOREIGN KEY (fecha_inicio_key) REFERENCES marts.dim_fecha(fecha_key)
+ f    | fct_devoluciones        | fk_fct_devoluciones_fecha_key           | FOREIGN KEY (fecha_key) REFERENCES marts.dim_fecha(fecha_key)
+ f    | fct_devoluciones        | fk_fct_devoluciones_producto_key        | FOREIGN KEY (producto_key) REFERENCES marts.dim_producto(producto_key)
+ f    | fct_inventario_snapshot | fk_fct_inventario_snapshot_fecha_key    | FOREIGN KEY (fecha_key) REFERENCES marts.dim_fecha(fecha_key)
+ f    | fct_inventario_snapshot | fk_fct_inventario_snapshot_producto_key | FOREIGN KEY (producto_key) REFERENCES marts.dim_producto(producto_key)
+ f    | fct_inventario_snapshot | fk_fct_inventario_snapshot_sucursal_key | FOREIGN KEY (sucursal_key) REFERENCES marts.dim_sucursal(sucursal_key)
+ f    | fct_metas_ventas        | fk_fct_metas_ventas_periodo_key         | FOREIGN KEY (periodo_key) REFERENCES marts.dim_fecha(fecha_key)
+ f    | fct_metas_ventas        | fk_fct_metas_ventas_sucursal_key        | FOREIGN KEY (sucursal_key) REFERENCES marts.dim_sucursal(sucursal_key)
+ f    | fct_precios_proveedor   | fk_fct_precios_proveedor_fecha_key      | FOREIGN KEY (fecha_key) REFERENCES marts.dim_fecha(fecha_key)
+ f    | fct_precios_proveedor   | fk_fct_precios_proveedor_producto_key   | FOREIGN KEY (producto_key) REFERENCES marts.dim_producto(producto_key)
+ f    | fct_ventas_linea        | fk_fct_ventas_linea_cliente_key         | FOREIGN KEY (cliente_key) REFERENCES marts.dim_cliente(cliente_key)
+ f    | fct_ventas_linea        | fk_fct_ventas_linea_fecha_key           | FOREIGN KEY (fecha_key) REFERENCES marts.dim_fecha(fecha_key)
+ f    | fct_ventas_linea        | fk_fct_ventas_linea_producto_key        | FOREIGN KEY (producto_key) REFERENCES marts.dim_producto(producto_key)
+ f    | fct_ventas_linea        | fk_fct_ventas_linea_sucursal_key        | FOREIGN KEY (sucursal_key) REFERENCES marts.dim_sucursal(sucursal_key)
+(30 rows)
+
+ tipo | restricciones 
+------+---------------
+ p    |            12
+ f    |            18
+(2 rows)
+
