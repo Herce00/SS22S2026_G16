@@ -81,9 +81,9 @@ Sin código. Cada respuesta se anota en "Puntos abiertos" de [design.md](design.
 
 ## T5 — Hecho incremental correcto
 
-- [ ] **Rojo (integración):** `tests/cierre/test_incremental.py`: tras una ejecución completa, cambiar en la base fuente una venta `PENDIENTE` a `ANULADA`, ejecutar de nuevo y exigir que sus líneas en `fct_ventas_linea` tengan `ANULADA` y que el hecho conserve 3209 filas. Restaurar el estado al terminar.
-- [ ] **Verde:** exponer `_loaded_at` en `int_ventas_linea` y cambiar el filtro incremental según C2 de [design.md](design.md).
-- [ ] Confirmar que `fct_ventas_linea` sigue materializado como `incremental`.
+- [x] **Rojo (integración):** `tests/cierre/test_incremental.py`: tras una ejecución completa, cambiar en la base fuente una venta `PENDIENTE` a `ANULADA`, ejecutar de nuevo y exigir que sus líneas en `fct_ventas_linea` tengan `ANULADA` y que el hecho conserve 3209 filas. Restaurar el estado al terminar.
+- [x] **Verde:** exponer `_loaded_at` en `int_ventas_linea` y cambiar el filtro incremental según C2 de [design.md](design.md).
+- [x] Confirmar que `fct_ventas_linea` sigue materializado como `incremental`.
 
 **Verificación:** `pytest tests/cierre -k "incremental"`.
 **Commit:** `fix(p1-dbt): let the incremental sales fact update changed rows`
