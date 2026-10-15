@@ -24,6 +24,12 @@ models:
         tests: [unique, not_null]
       - name: id_cliente
         tests: [unique, not_null]
+      - name: tipo_cliente
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Mayorista', 'Minorista', 'Restaurante', 'Tienda de barrio']
 
   - name: dim_categoria
     description: "Dimensión de categorías."
@@ -51,13 +57,21 @@ models:
       - name: categoria_key
         tests:
           - relationships:
-              to: ref('dim_categoria')
-              field: categoria_key
+              arguments:
+                to: ref('dim_categoria')
+                field: categoria_key
       - name: marca_key
         tests:
           - relationships:
-              to: ref('dim_marca')
-              field: marca_key
+              arguments:
+                to: ref('dim_marca')
+                field: marca_key
+      - name: activo
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
 
   - name: dim_promocion
     description: "Dimensión de campañas promocionales."
@@ -66,6 +80,27 @@ models:
         tests: [unique, not_null]
       - name: id_promocion
         tests: [unique, not_null]
+      - name: fecha_inicio_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
+      - name: fecha_fin_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
+      - name: categoria_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_categoria')
+                field: categoria_key
 
   - name: fct_ventas_linea
     description: "Hecho de ventas al nivel de línea de detalle."
@@ -78,26 +113,48 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_fecha')
-              field: fecha_key
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
       - name: cliente_key
         tests:
           - not_null
           - relationships:
-              to: ref('dim_cliente')
-              field: cliente_key
+              arguments:
+                to: ref('dim_cliente')
+                field: cliente_key
       - name: sucursal_key
         tests:
           - not_null
           - relationships:
-              to: ref('dim_sucursal')
-              field: sucursal_key
+              arguments:
+                to: ref('dim_sucursal')
+                field: sucursal_key
       - name: producto_key
         tests:
           - not_null
           - relationships:
-              to: ref('dim_producto')
-              field: producto_key
+              arguments:
+                to: ref('dim_producto')
+                field: producto_key
+      - name: canal
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Mayorista', 'Televenta', 'Tienda', 'Web']
+      - name: metodo_pago
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Crédito', 'Efectivo', 'Tarjeta', 'Transferencia']
+      - name: estado
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['ANULADA', 'COMPLETADA', 'PENDIENTE']
 
   - name: fct_inventario_snapshot
     description: "Hecho de inventario al nivel de fecha, sucursal, producto y lote."
@@ -108,20 +165,23 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_fecha')
-              field: fecha_key
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
       - name: sucursal_key
         tests:
           - not_null
           - relationships:
-              to: ref('dim_sucursal')
-              field: sucursal_key
+              arguments:
+                to: ref('dim_sucursal')
+                field: sucursal_key
       - name: producto_key
         tests:
           - not_null
           - relationships:
-              to: ref('dim_producto')
-              field: producto_key
+              arguments:
+                to: ref('dim_producto')
+                field: producto_key
 
   - name: fct_devoluciones
     description: "Hecho de devoluciones al nivel de devolución registrada."
@@ -132,8 +192,22 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_producto')
-              field: producto_key
+              arguments:
+                to: ref('dim_producto')
+                field: producto_key
+      - name: motivo
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Cliente desistió', 'Empaque defectuoso', 'Error de despacho', 'Producto dañado', 'Vencimiento cercano']
+      - name: fecha_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
 
   - name: fct_metas_ventas
     description: "Hecho de metas mensuales por sucursal."
@@ -144,14 +218,16 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_fecha')
-              field: fecha_key
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
       - name: sucursal_key
         tests:
           - not_null
           - relationships:
-              to: ref('dim_sucursal')
-              field: sucursal_key
+              arguments:
+                to: ref('dim_sucursal')
+                field: sucursal_key
 
   - name: fct_precios_proveedor
     description: "Hecho de precios por proveedor, producto y vigencia."
@@ -162,5 +238,13 @@ models:
         tests:
           - not_null
           - relationships:
-              to: ref('dim_producto')
-              field: producto_key
+              arguments:
+                to: ref('dim_producto')
+                field: producto_key
+      - name: fecha_key
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key

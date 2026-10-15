@@ -16,5 +16,5 @@ SELECT
     vd.cantidad * vd.precio_unitario * vd.descuento AS importe_descuento,
     GREATEST(vd._loaded_at, v._loaded_at) AS _loaded_at
 FROM {{ ref('stg_oltp__venta_detalle') }} AS vd
-INNER JOIN {{ ref('stg_oltp__venta') }} AS v
+LEFT JOIN {{ ref('stg_oltp__venta') }} AS v
     ON vd.id_venta = v.id_venta

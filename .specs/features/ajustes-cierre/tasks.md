@@ -90,11 +90,11 @@ Sin código. Cada respuesta se anota en "Puntos abiertos" de [design.md](design.
 
 ## T6 — Cobertura de pruebas dbt
 
-- [ ] **Rojo:** prueba estática que lee los YAML y exige: `unique` y `not_null` en cada clave sustituta de `marts`; `relationships` en cada clave foránea de los cinco hechos y de `dim_promocion`; `accepted_values` en las columnas categóricas de T1; `relationships` de `stg_oltp__venta_detalle.id_venta` hacia `stg_oltp__venta`.
-- [ ] **Rojo (integración):** una línea de detalle con una venta inexistente, en una copia de `raw`, llega al hecho y hace fallar `dbt test`.
-- [ ] **Verde:** agregar las pruebas y cambiar `int_ventas_linea` a `LEFT JOIN`.
-- [ ] Agregar `not_null` a las columnas obligatorias de `staging` según el contrato.
-- [ ] Ejecutar `dbt test` sobre los datos reales: todas las pruebas pasan.
+- [x] **Rojo:** prueba estática que lee los YAML y exige: `unique` y `not_null` en cada clave sustituta de `marts`; `relationships` en cada clave foránea de los cinco hechos y de `dim_promocion`; `accepted_values` en las columnas categóricas de T1; `relationships` de `stg_oltp__venta_detalle.id_venta` hacia `stg_oltp__venta`.
+- [x] **Rojo (integración):** una línea de detalle con una venta inexistente, en una copia de `raw`, llega al hecho y hace fallar `dbt test`.
+- [x] **Verde:** agregar las pruebas y cambiar `int_ventas_linea` a `LEFT JOIN`.
+- [x] Agregar `not_null` a las columnas obligatorias de `staging` según el contrato.
+- [x] Ejecutar `dbt test` sobre los datos reales: todas las pruebas pasan.
 
 **Verificación:** `pytest tests/cierre -k "cobertura"` y `dbt test` en verde.
 **Commit:** `test(p1-dbt): cover keys, relationships and categorical values`

@@ -9,6 +9,15 @@ models:
         tests:
           - unique
           - not_null
+      - name: nombre
+        tests:
+          - not_null
+      - name: ciudad
+        tests:
+          - not_null
+      - name: departamento
+        tests:
+          - not_null
 
   - name: stg_oltp__categoria
     description: "Categorías tipadas y limpiadas desde raw"
@@ -55,7 +64,18 @@ models:
       - name: activo
         tests:
           - accepted_values:
-              values: [true, false]
+              arguments:
+                values: [true, false]
+          - not_null
+      - name: unidad_medida
+        tests:
+          - not_null
+      - name: costo_base
+        tests:
+          - not_null
+      - name: precio_lista
+        tests:
+          - not_null
 
   - name: stg_oltp__cliente
     description: "Clientes tipados y limpiados desde raw"
@@ -68,6 +88,12 @@ models:
         tests:
           - not_null
       - name: fecha_alta
+        tests:
+          - not_null
+      - name: nombre
+        tests:
+          - not_null
+      - name: tipo_cliente
         tests:
           - not_null
 
@@ -91,17 +117,20 @@ models:
         tests:
           - not_null
           - accepted_values:
-              values: ['Tienda', 'Televenta', 'Mayorista', 'Web']
+              arguments:
+                values: ['Tienda', 'Televenta', 'Mayorista', 'Web']
       - name: metodo_pago
         tests:
           - not_null
           - accepted_values:
-              values: ['Efectivo', 'Tarjeta', 'Transferencia', 'Crédito']
+              arguments:
+                values: ['Efectivo', 'Tarjeta', 'Transferencia', 'Crédito']
       - name: estado
         tests:
           - not_null
           - accepted_values:
-              values: ['COMPLETADA', 'PENDIENTE', 'ANULADA']
+              arguments:
+                values: ['COMPLETADA', 'PENDIENTE', 'ANULADA']
 
   - name: stg_oltp__venta_detalle
     description: "Líneas de venta tipadas y limpiadas desde raw"
@@ -113,6 +142,10 @@ models:
       - name: id_venta
         tests:
           - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_oltp__venta')
+                field: id_venta
       - name: id_producto
         tests:
           - not_null
@@ -123,6 +156,9 @@ models:
         tests:
           - not_null
       - name: subtotal
+        tests:
+          - not_null
+      - name: descuento
         tests:
           - not_null
 
