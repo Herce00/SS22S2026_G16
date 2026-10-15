@@ -121,10 +121,11 @@ Sin código. Cada respuesta se anota en "Puntos abiertos" de [design.md](design.
 
 ## T9 — Casos de calidad
 
-- [ ] **Rojo (integración):** `tests/cierre/test_casos_calidad.py`: tras cargar los casos en `raw_calidad` y ejecutar dbt contra esa copia, cada caso aplicable a una tabla de `raw` produce al menos una prueba fallida; `staging` y `marts` de la corrida principal no cambian.
-- [ ] **Verde:** implementar la carga de C7 y la variable `schema_raw` en `_fuentes.yml`.
-- [ ] Listar los casos que no aplican a ninguna tabla cargada y explicar por qué.
-- [ ] Eliminar `raw_calidad` y los objetos de prueba al terminar.
+- [x] **Rojo (integración):** `tests/cierre/test_casos_calidad.py`: tras cargar los casos en `raw_calidad` y ejecutar dbt contra esa copia, cada caso aplicable a una tabla de `raw` produce al menos una prueba fallida; `staging` y `marts` de la corrida principal no cambian.
+- [x] **Verde:** implementar la carga de C7 y la variable `schema_raw` en `_fuentes.yml`.
+- [x] Listar los casos que no aplican a ninguna tabla cargada y explicar por qué.
+  - Resultado (2026-10-14): los 10 casos aplican; ninguno queda sin aplicar. El único cambio de nombre es la entidad `inventario`, que corresponde a la tabla `inventario_bodega`.
+- [x] Eliminar `raw_calidad` y los objetos de prueba al terminar.
 
 **Verificación:** `pytest tests/cierre -k "casos_calidad"`.
 **Commit:** `feat(p1-dbt): demonstrate quality tests against optional quality cases`

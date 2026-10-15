@@ -110,9 +110,17 @@ models:
       - name: id_cliente
         tests:
           - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_oltp__cliente')
+                field: id_cliente
       - name: id_sucursal
         tests:
           - not_null
+          - relationships:
+              arguments:
+                to: ref('stg_oltp__sucursal')
+                field: id_sucursal
       - name: canal
         tests:
           - not_null
