@@ -1,4 +1,10 @@
-SELECT 'dim_sucursal' AS tabla, COUNT(*) AS filas
+-- Pregunta: cuantas filas tiene cada tabla de marts?
+-- Resultado esperado: 12 filas, una por dimension y por hecho, con los conteos de la ultima
+-- ejecucion del DAG (se guardan en evidencia/marts_conteos.txt).
+SELECT 'dim_fecha' AS tabla, COUNT(*) AS filas
+FROM marts.dim_fecha
+UNION ALL
+SELECT 'dim_sucursal', COUNT(*)
 FROM marts.dim_sucursal
 UNION ALL
 SELECT 'dim_categoria', COUNT(*)
@@ -12,6 +18,9 @@ FROM marts.dim_producto
 UNION ALL
 SELECT 'dim_cliente', COUNT(*)
 FROM marts.dim_cliente
+UNION ALL
+SELECT 'dim_promocion', COUNT(*)
+FROM marts.dim_promocion
 UNION ALL
 SELECT 'fct_ventas_linea', COUNT(*)
 FROM marts.fct_ventas_linea

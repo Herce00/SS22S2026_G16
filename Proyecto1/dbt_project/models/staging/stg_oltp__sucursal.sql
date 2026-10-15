@@ -2,7 +2,7 @@
 -- La conversion es tolerante: un valor que no es un entero queda en NULL en lugar de
 -- romper el modelo, y la prueba not_null de _staging.yml lo reporta.
 SELECT
-    CASE WHEN id_sucursal ~ '^[0-9]+$' THEN id_sucursal::int END AS id_sucursal,
+    {{ convertir_seguro('id_sucursal', 'INTEGER') }} AS id_sucursal,
     nombre,
     ciudad,
     departamento,

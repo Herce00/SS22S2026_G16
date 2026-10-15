@@ -1,5 +1,11 @@
+{{ config(
+    post_hook=[
+        "{{ clave_primaria('sucursal_key') }}"
+    ]
+) }}
+
 SELECT
-    ROW_NUMBER() OVER (ORDER BY id_sucursal)::INTEGER AS sucursal_key,
+    {{ clave_sustituta(['id_sucursal']) }} AS sucursal_key,
     id_sucursal,
     nombre,
     ciudad,

@@ -2,165 +2,395 @@ version: 2
 
 models:
   - name: dim_fecha
-    description: "Dimensión calendario compartida por los procesos analíticos."
+    description: "Dimensión calendario compartida por todos los procesos. Una fila por fecha, desde la primera hasta la última fecha de los datos."
     columns:
       - name: fecha_key
+        description: "Clave de la fecha en formato AAAAMMDD (entero). Es determinista: la misma fecha siempre tiene la misma clave."
         tests: [unique, not_null]
       - name: fecha
+        description: "Fecha calendario."
         tests: [unique, not_null]
+      - name: dia
+        description: "Día del mes."
+      - name: mes
+        description: "Número del mes."
+      - name: nombre_mes
+        description: "Nombre del mes."
+      - name: trimestre
+        description: "Trimestre del año."
+      - name: anio
+        description: "Año."
+      - name: semana_anio
+        description: "Número de semana del año."
+      - name: es_fin_de_semana
+        description: "Verdadero si la fecha es sábado o domingo."
 
   - name: dim_sucursal
-    description: "Dimensión de sucursales."
+    description: "Dimensión de sucursales. Una fila por sucursal."
     columns:
       - name: sucursal_key
+        description: "Clave sustituta: MD5 de id_sucursal. La misma sucursal tiene la misma clave en cualquier ejecución."
         tests: [unique, not_null]
       - name: id_sucursal
+        description: "Clave natural de la sucursal en la fuente (raw.sucursal)."
         tests: [unique, not_null]
+      - name: nombre
+        description: "Nombre comercial de la sucursal."
+      - name: ciudad
+        description: "Ciudad de la sucursal."
+      - name: departamento
+        description: "Departamento de la sucursal."
 
   - name: dim_cliente
-    description: "Dimensión de clientes."
+    description: "Dimensión de clientes. Una fila por cliente."
     columns:
       - name: cliente_key
+        description: "Clave sustituta: MD5 de id_cliente. La misma clave en cualquier ejecución."
         tests: [unique, not_null]
       - name: id_cliente
+        description: "Clave natural del cliente en la fuente (raw.cliente)."
         tests: [unique, not_null]
+      - name: tipo_cliente
+        description: "Segmento del cliente: Mayorista, Minorista, Restaurante o Tienda de barrio."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Mayorista', 'Minorista', 'Restaurante', 'Tienda de barrio']
+      - name: nit
+        description: "NIT ficticio del cliente."
+      - name: nombre
+        description: "Nombre del cliente."
+      - name: municipio
+        description: "Municipio del cliente; admite nulos."
+      - name: departamento
+        description: "Departamento del cliente; admite nulos."
+      - name: fecha_alta
+        description: "Fecha de registro del cliente."
 
   - name: dim_categoria
-    description: "Dimensión de categorías."
+    description: "Dimensión de categorías de producto. Una fila por categoría."
     columns:
       - name: categoria_key
+        description: "Clave sustituta: MD5 de id_categoria."
         tests: [unique, not_null]
       - name: id_categoria
+        description: "Clave natural de la categoría en la fuente (raw.categoria)."
         tests: [unique, not_null]
+      - name: nombre
+        description: "Nombre de la categoría."
 
   - name: dim_marca
-    description: "Dimensión de marcas."
+    description: "Dimensión de marcas. Una fila por marca."
     columns:
       - name: marca_key
+        description: "Clave sustituta: MD5 de id_marca."
         tests: [unique, not_null]
       - name: id_marca
+        description: "Clave natural de la marca en la fuente (raw.marca)."
         tests: [unique, not_null]
+      - name: nombre
+        description: "Nombre de la marca."
 
   - name: dim_producto
-    description: "Dimensión de productos enriquecida con categoría y marca."
+    description: "Dimensión de productos, enriquecida con su categoría y su marca. Una fila por producto."
     columns:
       - name: producto_key
+        description: "Clave sustituta: MD5 de id_producto."
         tests: [unique, not_null]
       - name: id_producto
+        description: "Clave natural del producto en la fuente (raw.producto)."
         tests: [unique, not_null]
       - name: categoria_key
+        description: "Clave foránea hacia dim_categoria."
         tests:
           - relationships:
-              to: ref('dim_categoria')
-              field: categoria_key
+              arguments:
+                to: ref('dim_categoria')
+                field: categoria_key
       - name: marca_key
+        description: "Clave foránea hacia dim_marca."
         tests:
           - relationships:
-              to: ref('dim_marca')
-              field: marca_key
+              arguments:
+                to: ref('dim_marca')
+                field: marca_key
+      - name: activo
+        description: "Verdadero si el producto está activo."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [true, false]
+      - name: sku
+        description: "Código único del producto."
+      - name: nombre
+        description: "Nombre del producto."
+      - name: unidad_medida
+        description: "Unidad de comercialización."
+      - name: costo_base
+        description: "Costo de referencia del producto."
+      - name: precio_lista
+        description: "Precio de lista del producto."
 
   - name: dim_promocion
-    description: "Dimensión de campañas promocionales."
+    description: "Dimensión de campañas promocionales. Una fila por campaña, con su vigencia. La fuente no relaciona promociones con ventas, así que no se enlaza con ningún hecho."
     columns:
       - name: promocion_key
+        description: "Clave sustituta: MD5 de id_promocion."
         tests: [unique, not_null]
       - name: id_promocion
+        description: "Clave natural de la promoción en la fuente (raw.promociones)."
         tests: [unique, not_null]
+      - name: fecha_inicio_key
+        description: "Clave foránea hacia dim_fecha: inicio de la vigencia."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
+      - name: fecha_fin_key
+        description: "Clave foránea hacia dim_fecha: fin de la vigencia."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
+      - name: categoria_key
+        description: "Clave foránea hacia dim_categoria."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_categoria')
+                field: categoria_key
+      - name: nombre
+        description: "Nombre de la campaña."
+      - name: porcentaje_descuento
+        description: "Descuento de la campaña, entre 0 y 1."
 
   - name: fct_ventas_linea
-    description: "Hecho de ventas al nivel de línea de detalle."
+    description: "Hecho de ventas. Una fila por línea de detalle de venta. Incremental con id_detalle como clave única: una fila que cambia en la fuente se reemplaza. Los ingresos se calculan solo con ventas COMPLETADA."
     columns:
       - name: venta_linea_key
+        description: "Clave de la línea: MD5 de id_detalle."
         tests: [unique, not_null]
       - name: id_detalle
+        description: "Clave natural de la línea de detalle (raw.venta_detalle). También es la clave única del modelo incremental."
         tests: [unique, not_null]
       - name: fecha_key
+        description: "Clave foránea hacia dim_fecha: fecha de la venta."
         tests:
           - not_null
           - relationships:
-              to: ref('dim_fecha')
-              field: fecha_key
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
       - name: cliente_key
+        description: "Clave foránea hacia dim_cliente."
         tests:
           - not_null
           - relationships:
-              to: ref('dim_cliente')
-              field: cliente_key
+              arguments:
+                to: ref('dim_cliente')
+                field: cliente_key
       - name: sucursal_key
+        description: "Clave foránea hacia dim_sucursal."
         tests:
           - not_null
           - relationships:
-              to: ref('dim_sucursal')
-              field: sucursal_key
+              arguments:
+                to: ref('dim_sucursal')
+                field: sucursal_key
       - name: producto_key
+        description: "Clave foránea hacia dim_producto."
         tests:
           - not_null
           - relationships:
-              to: ref('dim_producto')
-              field: producto_key
+              arguments:
+                to: ref('dim_producto')
+                field: producto_key
+      - name: canal
+        description: "Canal de venta: Mayorista, Televenta, Tienda o Web."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Mayorista', 'Televenta', 'Tienda', 'Web']
+      - name: metodo_pago
+        description: "Método de pago: Crédito, Efectivo, Tarjeta o Transferencia."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Crédito', 'Efectivo', 'Tarjeta', 'Transferencia']
+      - name: estado
+        description: "Estado de la venta: COMPLETADA, PENDIENTE o ANULADA. Los ingresos cuentan solo las COMPLETADA."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['ANULADA', 'COMPLETADA', 'PENDIENTE']
+      - name: id_venta
+        description: "Identificador de la venta; dimensión degenerada."
+      - name: cantidad
+        description: "Unidades vendidas."
+      - name: precio_unitario
+        description: "Precio aplicado por unidad."
+      - name: descuento
+        description: "Descuento aplicado, entre 0 y 1."
+      - name: subtotal
+        description: "Importe neto registrado en la fuente."
+      - name: importe_bruto
+        description: "cantidad por precio_unitario."
+      - name: importe_descuento
+        description: "importe_bruto por descuento."
+      - name: _loaded_at
+        description: "Momento de la última carga de la línea en raw; columna de control del filtro incremental."
 
   - name: fct_inventario_snapshot
-    description: "Hecho de inventario al nivel de fecha, sucursal, producto y lote."
+    description: "Hecho de inventario. Una fila por fecha de corte, sucursal, producto y lote."
     columns:
       - name: inventario_snapshot_key
+        description: "Clave del registro: MD5 de fecha de corte, sucursal, producto y lote."
         tests: [unique, not_null]
       - name: fecha_key
+        description: "Clave foránea hacia dim_fecha: fecha de corte."
         tests:
           - not_null
           - relationships:
-              to: ref('dim_fecha')
-              field: fecha_key
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
       - name: sucursal_key
+        description: "Clave foránea hacia dim_sucursal."
         tests:
           - not_null
           - relationships:
-              to: ref('dim_sucursal')
-              field: sucursal_key
+              arguments:
+                to: ref('dim_sucursal')
+                field: sucursal_key
       - name: producto_key
+        description: "Clave foránea hacia dim_producto."
         tests:
           - not_null
           - relationships:
-              to: ref('dim_producto')
-              field: producto_key
+              arguments:
+                to: ref('dim_producto')
+                field: producto_key
+      - name: lote
+        description: "Identificador del lote."
+      - name: fecha_vencimiento
+        description: "Fecha de vencimiento del lote."
+      - name: stock_disponible
+        description: "Existencia disponible."
+      - name: stock_minimo
+        description: "Nivel mínimo permitido."
+      - name: stock_maximo
+        description: "Nivel máximo permitido."
+      - name: stock_faltante
+        description: "Unidades que faltan para llegar al mínimo; cero si no falta nada."
+      - name: stock_sobrante
+        description: "Unidades por encima del máximo; cero si no sobra nada."
+      - name: esta_bajo_minimo
+        description: "Verdadero si la existencia está por debajo del mínimo."
+      - name: esta_sobre_maximo
+        description: "Verdadero si la existencia supera el máximo."
 
   - name: fct_devoluciones
-    description: "Hecho de devoluciones al nivel de devolución registrada."
+    description: "Hecho de devoluciones. Una fila por devolución registrada."
     columns:
       - name: devolucion_key
+        description: "Identificador de la devolución (raw.devoluciones); es la clave natural y la clave del hecho."
         tests: [unique, not_null]
       - name: producto_key
+        description: "Clave foránea hacia dim_producto."
         tests:
           - not_null
           - relationships:
-              to: ref('dim_producto')
-              field: producto_key
+              arguments:
+                to: ref('dim_producto')
+                field: producto_key
+      - name: motivo
+        description: "Motivo de la devolución."
+        tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: ['Cliente desistió', 'Empaque defectuoso', 'Error de despacho', 'Producto dañado', 'Vencimiento cercano']
+      - name: fecha_key
+        description: "Clave foránea hacia dim_fecha."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
+      - name: id_devolucion
+        description: "Clave natural de la devolución en la fuente."
+      - name: id_venta
+        description: "Venta asociada; referencia degenerada, no tiene dimensión."
+      - name: cantidad
+        description: "Cantidad devuelta."
 
   - name: fct_metas_ventas
-    description: "Hecho de metas mensuales por sucursal."
+    description: "Hecho de metas mensuales. Una fila por periodo mensual y sucursal."
     columns:
       - name: meta_key
+        description: "Clave de la meta: MD5 de periodo y sucursal."
         tests: [unique, not_null]
       - name: periodo_key
+        description: "Clave foránea hacia dim_fecha: primer día del mes de la meta."
         tests:
           - not_null
           - relationships:
-              to: ref('dim_fecha')
-              field: fecha_key
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
       - name: sucursal_key
+        description: "Clave foránea hacia dim_sucursal."
         tests:
           - not_null
           - relationships:
-              to: ref('dim_sucursal')
-              field: sucursal_key
+              arguments:
+                to: ref('dim_sucursal')
+                field: sucursal_key
+      - name: periodo
+        description: "Periodo original en formato AAAA-MM."
+      - name: meta_ventas
+        description: "Meta monetaria del mes."
+      - name: meta_unidades
+        description: "Meta de unidades del mes."
 
   - name: fct_precios_proveedor
-    description: "Hecho de precios por proveedor, producto y vigencia."
+    description: "Hecho de precios de proveedores. Una fila por proveedor, producto y fecha de vigencia."
     columns:
       - name: precio_proveedor_key
+        description: "Clave del registro: MD5 de proveedor, producto y fecha de vigencia."
         tests: [unique, not_null]
       - name: producto_key
+        description: "Clave foránea hacia dim_producto."
         tests:
           - not_null
           - relationships:
-              to: ref('dim_producto')
-              field: producto_key
+              arguments:
+                to: ref('dim_producto')
+                field: producto_key
+      - name: fecha_key
+        description: "Clave foránea hacia dim_fecha: inicio de la vigencia del precio."
+        tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('dim_fecha')
+                field: fecha_key
+      - name: id_proveedor
+        description: "Identificador natural del proveedor."
+      - name: proveedor
+        description: "Nombre del proveedor."
+      - name: costo_proveedor
+        description: "Costo ofrecido por el proveedor."
+      - name: plazo_dias
+        description: "Tiempo de entrega en días."

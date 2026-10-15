@@ -1,0 +1,31 @@
+# Carga de los casos de calidad sobre raw_calidad (copia de raw)
+APLICA	cliente.id_cliente	cliente, fila 1, valor '' (NULL en identificador)
+APLICA	producto.precio_lista	producto, fila 1, valor '-12.50' (Precio negativo)
+APLICA	venta.id_cliente	venta, fila 1, valor '999999' (FK huérfana)
+APLICA	venta_detalle.cantidad	venta_detalle, fila 1, valor '0' (Cantidad cero)
+APLICA	venta_detalle.descuento	venta_detalle, fila 2, valor '1.20' (Descuento mayor a 100%)
+APLICA	inventario.stock_disponible	inventario_bodega, fila 1, valor '-5' (Stock negativo)
+APLICA	inventario.fecha_vencimiento	inventario_bodega, fila 2, valor '2025-12-31' (Vencimiento anterior al corte)
+APLICA	proveedores_precios.costo_proveedor	proveedores_precios, fila 1, valor '' (Costo nulo)
+APLICA	metas_ventas.meta_ventas	metas_ventas, fila 1, valor '0' (Meta cero)
+APLICA	devoluciones.cantidad	devoluciones, fila 1, valor '99' (Devolución superior a venta)
+
+# dbt run contra raw_calidad: Done. PASS=29 WARN=0 ERROR=0 SKIP=0 NO-OP=0 REUSED=0 TOTAL=29
+
+# dbt test contra raw_calidad: Done. PASS=181 WARN=0 ERROR=13 SKIP=0 NO-OP=0 REUSED=0 TOTAL=194
+# Pruebas que fallan:
+100 of 194 FAIL 1 not_null_stg_archivos__proveedores_precios_costo_proveedor ... [FAIL 1 in 0.24s]
+109 of 194 FAIL 1 not_null_stg_oltp__cliente_id_cliente ........................ [FAIL 1 in 0.10s]
+11 of 194 FAIL 1 assert_devolucion_no_supera_venta ............................. [FAIL 1 in 0.12s]
+12 of 194 FAIL 1 assert_inventario_vencimiento_posterior_al_corte .............. [FAIL 1 in 0.13s]
+121 of 194 FAIL 1 not_null_stg_oltp__producto_precio_lista ..................... [FAIL 1 in 0.12s]
+13 of 194 FAIL 1 assert_metas_positivas ........................................ [FAIL 1 in 0.11s]
+14 of 194 FAIL 1 assert_ventas_cantidad_positiva ............................... [FAIL 1 in 0.11s]
+15 of 194 FAIL 1 assert_ventas_descuento_en_rango .............................. [FAIL 1 in 0.15s]
+16 of 194 FAIL 2 assert_ventas_subtotal_consistente ............................ [FAIL 2 in 0.09s]
+161 of 194 FAIL 4 relationships_stg_oltp__venta_id_cliente__id_cliente__ref_stg_oltp__cliente_  [FAIL 4 in 0.93s]
+20 of 194 FAIL 1 not_null_dim_cliente_id_cliente ............................... [FAIL 1 in 0.10s]
+51 of 194 FAIL 10 not_null_fct_ventas_linea_cliente_key ........................ [FAIL 10 in 0.09s]
+87 of 194 FAIL 1 not_null_stg_archivos__inventario_bodega_stock_disponible ..... [FAIL 1 in 0.12s]
+
+# raw_calidad y schemas de prueba eliminados

@@ -1,0 +1,10 @@
+     sucursal      | ventas | unidades | ingresos  | ventas_anuladas | ventas_pendientes 
+-------------------+--------+----------+-----------+-----------------+-------------------
+ Villa Nueva       |    203 |     3386 | 149831.60 |               6 |                 3
+ Central Guatemala |    194 |     3156 | 139839.95 |              11 |                 2
+ Escuintla         |    195 |     3062 | 129392.30 |               7 |                 3
+ Mixco             |    181 |     2715 | 122146.08 |               4 |                 5
+ Amatitlán         |    182 |     2872 | 120463.79 |              10 |                 7
+ Antigua           |    174 |     2772 | 118528.00 |              10 |                 3
+(6 rows)
+

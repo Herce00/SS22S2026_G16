@@ -1,5 +1,14 @@
+{{ config(
+    post_hook=[
+        "{{ clave_primaria('promocion_key') }}",
+        "{{ clave_foranea('fecha_inicio_key', 'dim_fecha', 'fecha_key') }}",
+        "{{ clave_foranea('fecha_fin_key', 'dim_fecha', 'fecha_key') }}",
+        "{{ clave_foranea('categoria_key', 'dim_categoria', 'categoria_key') }}"
+    ]
+) }}
+
 SELECT
-    ROW_NUMBER() OVER (ORDER BY p.id_promocion)::INTEGER AS promocion_key,
+    {{ clave_sustituta(['p.id_promocion']) }} AS promocion_key,
     p.id_promocion,
     p.nombre,
     TO_CHAR(p.fecha_inicio, 'YYYYMMDD')::INTEGER AS fecha_inicio_key,

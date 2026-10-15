@@ -85,10 +85,11 @@ Formato de los CSV: separador coma, UTF-8 **con BOM**, fin de línea CRLF, una f
 | D5 | Estrategia de carga | Truncar y recargar dentro de una transacción. | Idempotente y suficiente para el volumen (unas 8.800 filas). |
 | D6 | dbt desde Airflow | `BashOperator` con `dbt run` y `dbt test`. | Sin dependencias adicionales. |
 | D7 | Versiones | Verificadas y fijadas en [tech-stack.md](tech-stack.md). | Evitar incompatibilidades entre Airflow, Python y dbt. |
-| D8 | Casos de calidad opcionales | `casos_calidad_opcionales.csv` no se carga en la corrida principal. Su uso para probar la calidad de datos es opcional y lo define B. | Lo indica el catálogo oficial; mezclarlos alteraría las cifras reales. |
+| D8 | Casos de calidad opcionales | `casos_calidad_opcionales.csv` no se carga en la corrida principal. Cerrada el 2026-10-14: se usan para demostrar las pruebas dbt, cargados en un schema aparte `raw_calidad` y probados con la variable `schema_raw`, sin tocar `raw`, `staging` ni `marts`. | Lo indica el catálogo oficial; mezclarlos alteraría las cifras reales. |
 | D9 | Ejecución de dbt en el DAG | El DAG ejecuta `dbt deps` (solo si existe `packages.yml`), `dbt run` y `dbt test` sobre el proyecto completo, sin selectores. `profiles.yml` vive dentro de `dbt_project/` y lee las variables `DW_*`. | El DAG no conoce modelos concretos: B cambia el proyecto sin tocar el DAG. |
 | D10 | Validaciones finales | El DAG ejecuta cada archivo `.sql` de `Proyecto1/sql/validaciones/dag/`. Una validación pasa si su consulta devuelve cero filas. | B agrega o quita validaciones sin tocar el DAG. |
 | D11 | Esqueleto del proyecto dbt | A deja armado un esqueleto mínimo en `Proyecto1/dbt_project/` a pedido de B. Desde su entrega, el proyecto es propiedad de B. | B arranca con el proyecto conectado y ejecutable. |
+| D12 | Ajustes de cierre sobre el trabajo de B | Desde el 2026-10-14, B autoriza que A edite `dbt_project/` y `sql/validaciones/` para aplicar los ajustes de la feature `ajustes-cierre`, informándole los cambios al terminar (`docs/cambios_ajustes_cierre.md`). | La revisión de `5c50f47` encontró defectos que conviene corregir antes de la entrega. |
 
 D9, D10 y D11 las definió A el 2026-10-10 como punto de partida, porque B aún no había comenzado. B puede cambiarlas por el procedimiento normal de zona amarilla.
 
@@ -201,7 +202,7 @@ El trabajo de los dos se toca solo en cuatro puntos. Fuera de ellos, cada uno ca
 | 5 | Validaciones | Tarea de conteos y tarea de validaciones SQL en el DAG (entregado) | Consultas de validación y analíticas (pendiente) |
 | 6 | Cierre | README de ingesta, DAG y evidencias con capturas (entregado) | README de modelado, evidencias, `dbt docs` (pendiente) |
 
-## Estado al 2026-10-10
+## Estado al 2026-10-14
 
 **Rol A: las cuatro features están terminadas y revisadas.**
 
@@ -212,32 +213,35 @@ El trabajo de los dos se toca solo en cuatro puntos. Fuera de ellos, cada uno ca
 | `ingesta-raw` | Paquete `sgfood_ingesta`: extracción y carga de las 12 tablas, 8.864 filas | `.specs/features/ingesta-raw/` |
 | `dag-orquestacion` | DAG `sgfood_elt` de 17 tareas, validaciones, esqueleto dbt y guía para B | `.specs/features/dag-orquestacion/` |
 
-**Rol B: no ha comenzado.** Su punto de partida es `Proyecto1/docs/guia_rol_b.md`, que incluye la lista de lo que le corresponde.
+**Rol B: entregó su parte (PR #6, `5c50f47`, fusionado en `c44e170`).** Sobre el esqueleto construyó 12 modelos de `staging`, 5 de `intermediate` y 12 de `marts` (7 dimensiones y 5 hechos, uno incremental), con pruebas, descripciones, consultas analíticas y validaciones finales. Decidió que `intermediate` se materializa en el schema `staging` y conservó `stg_oltp__sucursal`. No usó los casos de calidad opcionales; la decisión D8 se cerró en `ajustes-cierre`.
+
+**Ajustes de cierre (`ajustes-cierre`, rama `fix/ajustes-cierre`).** La revisión del trabajo de B encontró 14 hallazgos. Con su autorización (D12), el Rol A los corrigió sin cambiar el modelo dimensional: claves sustitutas estables (`MD5` de la clave natural), hecho incremental que actualiza las filas que cambian, conversiones tolerantes con `pg_input_is_valid`, claves primarias y foráneas físicas en `marts`, cobertura de pruebas, ingresos solo de ventas `COMPLETADA`, casos de calidad probados sobre una copia de `raw`, pgAdmin opcional con versión fija y evidencia regenerada desde una ejecución limpia del DAG. B recibe el detalle en `Proyecto1/docs/cambios_ajustes_cierre.md`. Spec: `.specs/features/ajustes-cierre/`.
 
 ## Pendientes
 
 **Del rol A**
 
-- [ ] Abrir el pull request de `feat/ingesta-airflow` hacia `main` y avisar a B. Sin ese merge, B no tiene de dónde partir.
+- [ ] Abrir el pull request de `fix/ajustes-cierre` hacia `main` y avisar a B con `docs/cambios_ajustes_cierre.md`.
 - [x] Tomar las capturas de la interfaz de Airflow: grafo del DAG, ejecución exitosa y fallo controlado.
-- [ ] Revisar el pull request de B cuando llegue.
+- [x] Abrir el pull request de `feat/ingesta-airflow` hacia `main`.
+- [x] Revisar el pull request de B (hallazgos en `ajustes-cierre`).
 
 **Del rol B**
 
-- [ ] Diseñar el modelo dimensional: hechos, dimensiones y granularidad.
-- [ ] Modelos `staging` de las 11 tablas restantes, modelos `intermediate` y `marts`.
-- [ ] Materializaciones, incluida al menos una incremental donde aplique.
-- [ ] Pruebas dbt: `unique`, `not_null`, `relationships`, `accepted_values` y una personalizada.
-- [ ] Documentación dbt y `dbt docs generate`.
-- [ ] Consultas analíticas y de validación en `sql/validaciones/`.
-- [ ] Secciones del README: modelo del DW, estructura dbt y justificación de diseño.
-- [ ] Evidencia de su parte.
-- [ ] Decidir dónde se materializa la capa intermediate. Hoy no tiene schema asignado y caería en `public`.
-- [ ] Decidir si se usan los casos de calidad opcionales y cómo.
+- [x] Diseñar el modelo dimensional: hechos, dimensiones y granularidad.
+- [x] Modelos `staging`, `intermediate` y `marts`.
+- [x] Materializaciones, incluida una incremental (`fct_ventas_linea`).
+- [x] Pruebas dbt: `unique`, `not_null`, `relationships`, `accepted_values` y pruebas singulares.
+- [x] Documentación dbt y `dbt docs generate`.
+- [x] Consultas analíticas y de validación en `sql/validaciones/`.
+- [x] Secciones del README: modelo del DW, estructura dbt y justificación de diseño.
+- [x] Decidir dónde se materializa la capa intermediate (schema `staging`).
+- [x] Decidir si se usan los casos de calidad opcionales (D8 cerrada: se prueban sobre una copia de `raw`).
+- [ ] Revisar `docs/cambios_ajustes_cierre.md` y el pull request de `fix/ajustes-cierre`.
 
 **De ambos**
 
-- [ ] Ejecutar `sgfood_elt` con el proyecto dbt completo y guardar la evidencia.
+- [x] Ejecutar `sgfood_elt` con el proyecto dbt completo y guardar la evidencia (regenerada en `ajustes-cierre` desde un entorno limpio).
 - [ ] Revisión cruzada final: cada uno debe poder explicar el pipeline entero.
 - [ ] Entrega en UEDI.
 

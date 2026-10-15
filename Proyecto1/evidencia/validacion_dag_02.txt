@@ -1,0 +1,4 @@
+ validacion | clave 
+------------+-------
+(0 rows)
+

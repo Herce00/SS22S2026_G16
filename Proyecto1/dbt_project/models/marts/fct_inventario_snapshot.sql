@@ -1,3 +1,12 @@
+{{ config(
+    post_hook=[
+        "{{ clave_primaria('inventario_snapshot_key') }}",
+        "{{ clave_foranea('fecha_key', 'dim_fecha', 'fecha_key') }}",
+        "{{ clave_foranea('sucursal_key', 'dim_sucursal', 'sucursal_key') }}",
+        "{{ clave_foranea('producto_key', 'dim_producto', 'producto_key') }}"
+    ]
+) }}
+
 SELECT
     MD5(CONCAT_WS('|', i.fecha_corte, i.id_sucursal, i.id_producto, i.lote)) AS inventario_snapshot_key,
     TO_CHAR(i.fecha_corte, 'YYYYMMDD')::INTEGER AS fecha_key,

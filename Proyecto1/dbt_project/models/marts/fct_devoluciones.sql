@@ -1,3 +1,11 @@
+{{ config(
+    post_hook=[
+        "{{ clave_primaria('devolucion_key') }}",
+        "{{ clave_foranea('fecha_key', 'dim_fecha', 'fecha_key') }}",
+        "{{ clave_foranea('producto_key', 'dim_producto', 'producto_key') }}"
+    ]
+) }}
+
 SELECT
     d.id_devolucion AS devolucion_key,
     d.id_devolucion,

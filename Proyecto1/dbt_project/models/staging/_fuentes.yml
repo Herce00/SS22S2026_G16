@@ -2,7 +2,7 @@ version: 2
 
 sources:
   - name: oltp
-    schema: raw
+    schema: "{{ var('schema_raw', 'raw') }}"
     description: "Tablas transaccionales extraídas de oltp_sgfood hacia raw"
     tables:
       - name: sucursal
@@ -79,7 +79,7 @@ sources:
           - name: _loaded_at
 
   - name: archivos
-    schema: raw
+    schema: "{{ var('schema_raw', 'raw') }}"
     description: "Tablas cargadas desde archivos CSV hacia raw"
     tables:
       - name: inventario_bodega

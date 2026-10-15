@@ -17,9 +17,6 @@ def test_archivos_esqueleto_dbt_existen(proyecto1_dir):
         os.path.join(dbt_dir, "macros", "generate_schema_name.sql"),
         os.path.join(dbt_dir, "models", "staging", "_fuentes.yml"),
         os.path.join(dbt_dir, "models", "staging", "_staging.yml"),
-        os.path.join(dbt_dir, "models", "staging", "stg_oltp__sucursal.sql"),
-        os.path.join(dbt_dir, "models", "intermediate", ".gitkeep"),
-        os.path.join(dbt_dir, "models", "marts", ".gitkeep"),
     ]
     for ruta in archivos_esperados:
         assert os.path.exists(ruta), f"Archivo requerido no existe: {ruta}"
@@ -56,7 +53,9 @@ def test_fuentes_dbt_coinciden_con_fuentes_yml(proyecto1_dir):
 
     tablas_declaradas = set()
     for source in data.get("sources", []):
-        assert source.get("schema") == "raw", f"El schema de la fuente debe ser 'raw': {source.get('schema')}"
+        assert source.get("schema") == "{{ var('schema_raw', 'raw') }}", (
+            f"El schema de la fuente debe ser raw (parametrizable con schema_raw): {source.get('schema')}"
+        )
         for tbl in source.get("tables", []):
             tablas_declaradas.add(tbl.get("name"))
 
@@ -65,26 +64,35 @@ def test_fuentes_dbt_coinciden_con_fuentes_yml(proyecto1_dir):
         assert tbl in fuentes_config, f"Tabla '{tbl}' en _fuentes.yml no existe en fuentes.yml de ingesta"
 
 
-def test_models_contiene_unico_archivo_sql(proyecto1_dir):
-    """models/ contiene un único archivo .sql, y ninguno en intermediate/ ni marts/."""
-    models_dir = os.path.join(proyecto1_dir, "dbt_project", "models")
-    assert os.path.exists(models_dir), f"models no existe en {models_dir}"
+def test_dbt_project_yml_valido(proyecto1_dir):
+    """dbt_project.yml declara el proyecto, el perfil y las rutas que el DAG espera."""
+    ruta = os.path.join(proyecto1_dir, "dbt_project", "dbt_project.yml")
+    with open(ruta, "r", encoding="utf-8") as f:
+        cfg = yaml.safe_load(f)
+    assert cfg.get("name") == "sgfood"
+    assert cfg.get("profile") == "sgfood"
+    assert cfg.get("model-paths") == ["models"]
+    assert cfg.get("macro-paths") == ["macros"]
 
-    archivos_sql = []
-    for root, dirs, files in os.walk(models_dir):
-        for file in files:
-            if file.endswith(".sql"):
-                archivos_sql.append(os.path.join(root, file))
 
-    assert len(archivos_sql) == 1, f"Se esperaba exactamente un archivo .sql en models/, se encontraron {len(archivos_sql)}: {archivos_sql}"
-    assert os.path.basename(archivos_sql[0]) == "stg_oltp__sucursal.sql"
+def test_macro_schema_define_generate_schema_name(proyecto1_dir):
+    """El macro de schema evita prefijos como staging_staging."""
+    ruta = os.path.join(proyecto1_dir, "dbt_project", "macros", "generate_schema_name.sql")
+    with open(ruta, "r", encoding="utf-8") as f:
+        contenido = f.read()
+    assert "macro generate_schema_name" in contenido
+    assert "custom_schema_name" in contenido
 
-    # Verificar intermediate y marts vacíos de .sql
-    for sub in ["intermediate", "marts"]:
-        sub_dir = os.path.join(models_dir, sub)
-        if os.path.exists(sub_dir):
-            sqls = [f for f in os.listdir(sub_dir) if f.endswith(".sql")]
-            assert len(sqls) == 0, f"Carpeta {sub} no debe contener archivos .sql: {sqls}"
+
+def test_fuentes_dbt_declaran_las_tablas_de_raw(proyecto1_dir):
+    """_fuentes.yml declara las 12 tablas de raw de fuentes.yml, ni mas ni menos."""
+    esperadas = {f.tabla_raw for f in listar_fuentes()}
+    assert len(esperadas) == 12
+    ruta = os.path.join(proyecto1_dir, "dbt_project", "models", "staging", "_fuentes.yml")
+    with open(ruta, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    declaradas = {t["name"] for s in data["sources"] for t in s["tables"]}
+    assert declaradas == esperadas
 
 
 @pytest.mark.integracion
