@@ -1,5 +1,5 @@
 SELECT
-    TO_DATE(m.periodo || '-01', 'YYYY-MM-DD') AS periodo_fecha,
+    {{ convertir_seguro("m.periodo || '-01'", 'DATE') }} AS periodo_fecha,
     m.periodo,
     m.id_sucursal,
     m.meta_ventas,

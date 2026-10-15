@@ -17,35 +17,20 @@ WITH fuente AS (
 tipado AS (
 
     SELECT
-        CASE
-            WHEN TRIM(id_producto) ~ '^[0-9]+$'
-            THEN TRIM(id_producto)::INTEGER
-        END AS id_producto,
+        {{ convertir_seguro('id_producto', 'INTEGER') }} AS id_producto,
 
         NULLIF(TRIM(sku), '') AS sku,
         NULLIF(TRIM(nombre), '') AS nombre,
 
-        CASE
-            WHEN TRIM(id_categoria) ~ '^[0-9]+$'
-            THEN TRIM(id_categoria)::INTEGER
-        END AS id_categoria,
+        {{ convertir_seguro('id_categoria', 'INTEGER') }} AS id_categoria,
 
-        CASE
-            WHEN TRIM(id_marca) ~ '^[0-9]+$'
-            THEN TRIM(id_marca)::INTEGER
-        END AS id_marca,
+        {{ convertir_seguro('id_marca', 'INTEGER') }} AS id_marca,
 
         NULLIF(TRIM(unidad_medida), '') AS unidad_medida,
 
-        CASE
-            WHEN TRIM(costo_base) ~ '^[0-9]+(\.[0-9]+)?$'
-            THEN TRIM(costo_base)::NUMERIC(12,2)
-        END AS costo_base,
+        {{ convertir_seguro('costo_base', 'NUMERIC(12,2)') }} AS costo_base,
 
-        CASE
-            WHEN TRIM(precio_lista) ~ '^[0-9]+(\.[0-9]+)?$'
-            THEN TRIM(precio_lista)::NUMERIC(12,2)
-        END AS precio_lista,
+        {{ convertir_seguro('precio_lista', 'NUMERIC(12,2)') }} AS precio_lista,
 
         CASE
             WHEN LOWER(TRIM(activo)) IN ('true', 'false')

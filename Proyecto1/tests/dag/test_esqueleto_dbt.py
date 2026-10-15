@@ -53,7 +53,9 @@ def test_fuentes_dbt_coinciden_con_fuentes_yml(proyecto1_dir):
 
     tablas_declaradas = set()
     for source in data.get("sources", []):
-        assert source.get("schema") == "raw", f"El schema de la fuente debe ser 'raw': {source.get('schema')}"
+        assert source.get("schema") == "{{ var('schema_raw', 'raw') }}", (
+            f"El schema de la fuente debe ser raw (parametrizable con schema_raw): {source.get('schema')}"
+        )
         for tbl in source.get("tables", []):
             tablas_declaradas.add(tbl.get("name"))
 

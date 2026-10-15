@@ -59,10 +59,10 @@ Sin código. Cada respuesta se anota en "Puntos abiertos" de [design.md](design.
 
 ## T3 — Conversiones tolerantes
 
-- [ ] **Rojo (integración):** `tests/cierre/test_conversiones.py` crea una copia de `raw` con `2026-02-30` en una fecha, `13` en un mes de `metas_ventas`, `12.5` en un descuento y un entero de 12 dígitos; ejecuta `dbt run` contra la copia y exige que termine con código 0, que esos valores queden en `NULL` y que `dbt test` reporte las columnas obligatorias afectadas. Falla hoy porque `dbt run` se detiene.
-- [ ] **Verde:** crear `macros/convertir_seguro.sql` y usarlo en todos los modelos de `staging` y en `int_metas_ventas`.
-- [ ] Conservar como condiciones explícitas las reglas de negocio que B ya aplicaba.
-- [ ] Ejecutar el pipeline normal y comprobar que los conteos de `marts` no cambian.
+- [x] **Rojo (integración):** `tests/cierre/test_conversiones.py` crea una copia de `raw` con `2026-02-30` en una fecha, `13` en un mes de `metas_ventas`, `12.5` en un descuento y un entero de 12 dígitos; ejecuta `dbt run` contra la copia y exige que termine con código 0, que esos valores queden en `NULL` y que `dbt test` reporte las columnas obligatorias afectadas. Falla hoy porque `dbt run` se detiene.
+- [x] **Verde:** crear `macros/convertir_seguro.sql` y usarlo en todos los modelos de `staging` y en `int_metas_ventas`.
+- [x] Conservar como condiciones explícitas las reglas de negocio que B ya aplicaba.
+- [x] Ejecutar el pipeline normal y comprobar que los conteos de `marts` no cambian.
 
 **Verificación:** `pytest tests/cierre -k "conversiones"` y una ejecución del DAG en verde.
 **Commit:** `fix(p1-dbt): convert staging types tolerantly with pg_input_is_valid`
