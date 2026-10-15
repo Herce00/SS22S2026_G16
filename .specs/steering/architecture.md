@@ -85,10 +85,11 @@ Formato de los CSV: separador coma, UTF-8 **con BOM**, fin de línea CRLF, una f
 | D5 | Estrategia de carga | Truncar y recargar dentro de una transacción. | Idempotente y suficiente para el volumen (unas 8.800 filas). |
 | D6 | dbt desde Airflow | `BashOperator` con `dbt run` y `dbt test`. | Sin dependencias adicionales. |
 | D7 | Versiones | Verificadas y fijadas en [tech-stack.md](tech-stack.md). | Evitar incompatibilidades entre Airflow, Python y dbt. |
-| D8 | Casos de calidad opcionales | `casos_calidad_opcionales.csv` no se carga en la corrida principal. Su uso para probar la calidad de datos es opcional y lo define B. | Lo indica el catálogo oficial; mezclarlos alteraría las cifras reales. |
+| D8 | Casos de calidad opcionales | `casos_calidad_opcionales.csv` no se carga en la corrida principal. Cerrada el 2026-10-14: se usan para demostrar las pruebas dbt, cargados en un schema aparte `raw_calidad` y probados con la variable `schema_raw`, sin tocar `raw`, `staging` ni `marts`. | Lo indica el catálogo oficial; mezclarlos alteraría las cifras reales. |
 | D9 | Ejecución de dbt en el DAG | El DAG ejecuta `dbt deps` (solo si existe `packages.yml`), `dbt run` y `dbt test` sobre el proyecto completo, sin selectores. `profiles.yml` vive dentro de `dbt_project/` y lee las variables `DW_*`. | El DAG no conoce modelos concretos: B cambia el proyecto sin tocar el DAG. |
 | D10 | Validaciones finales | El DAG ejecuta cada archivo `.sql` de `Proyecto1/sql/validaciones/dag/`. Una validación pasa si su consulta devuelve cero filas. | B agrega o quita validaciones sin tocar el DAG. |
 | D11 | Esqueleto del proyecto dbt | A deja armado un esqueleto mínimo en `Proyecto1/dbt_project/` a pedido de B. Desde su entrega, el proyecto es propiedad de B. | B arranca con el proyecto conectado y ejecutable. |
+| D12 | Ajustes de cierre sobre el trabajo de B | Desde el 2026-10-14, B autoriza que A edite `dbt_project/` y `sql/validaciones/` para aplicar los ajustes de la feature `ajustes-cierre`, informándole los cambios al terminar (`docs/cambios_ajustes_cierre.md`). | La revisión de `5c50f47` encontró defectos que conviene corregir antes de la entrega. |
 
 D9, D10 y D11 las definió A el 2026-10-10 como punto de partida, porque B aún no había comenzado. B puede cambiarlas por el procedimiento normal de zona amarilla.
 

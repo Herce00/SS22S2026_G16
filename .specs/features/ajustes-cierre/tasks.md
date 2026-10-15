@@ -28,9 +28,9 @@ Las rutas son relativas a `Proyecto1/` y los comandos se ejecutan desde esa carp
 
 ## T0 — Rama y decisiones
 
-- [ ] Crear la rama `fix/ajustes-cierre` desde `main` actualizado.
-- [ ] Registrar en [architecture.md](../../steering/architecture.md) la decisión D12: desde el 2026-10-14, B autoriza que A edite `dbt_project/` y `sql/validaciones/`, informándole los cambios.
-- [ ] Registrar el cierre de D8 según la decisión C7 de [design.md](design.md).
+- [x] Crear la rama `fix/ajustes-cierre` desde `main` actualizado.
+- [x] Registrar en [architecture.md](../../steering/architecture.md) la decisión D12: desde el 2026-10-14, B autoriza que A edite `dbt_project/` y `sql/validaciones/`, informándole los cambios.
+- [x] Registrar el cierre de D8 según la decisión C7 de [design.md](design.md).
 
 **Verificación:** `git branch --show-current` devuelve `fix/ajustes-cierre`.
 **Commit:** `docs(p1): record closing decisions for role b fixes`
