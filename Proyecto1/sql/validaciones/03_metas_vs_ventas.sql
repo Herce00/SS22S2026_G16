@@ -1,3 +1,7 @@
+-- Pregunta: cada sucursal cumplio su meta mensual de ventas y de unidades?
+-- Regla de ingresos: las ventas reales cuentan solo ventas con estado COMPLETADA, el mismo
+-- criterio de 02_ventas_por_sucursal.sql.
+-- Resultado esperado: una fila por meta (periodo y sucursal) con la meta y lo vendido en ese mes.
 WITH ventas_mensuales AS (
     SELECT
         v.fecha_key / 100 AS periodo,
@@ -5,6 +9,7 @@ WITH ventas_mensuales AS (
         SUM(v.subtotal) AS ventas_reales,
         SUM(v.cantidad) AS unidades_reales
     FROM marts.fct_ventas_linea AS v
+    WHERE v.estado = 'COMPLETADA'
     GROUP BY v.fecha_key / 100, v.sucursal_key
 )
 SELECT

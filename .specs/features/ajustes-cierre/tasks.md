@@ -111,10 +111,10 @@ Sin código. Cada respuesta se anota en "Puntos abiertos" de [design.md](design.
 
 ## T8 — Consultas y validaciones finales
 
-- [ ] **Rojo (integración):** `tests/cierre/test_consultas.py`: el total de ingresos de `02_ventas_por_sucursal.sql` coincide con la suma de subtotales de ventas `COMPLETADA`; `03_metas_vs_ventas.sql` usa el mismo criterio.
-- [ ] **Rojo (integración):** cada validación de `sql/validaciones/dag/` detecta un caso inválido preparado para ella en una copia de `marts`.
-- [ ] **Verde:** aplicar los cambios de C6 de [design.md](design.md).
-- [ ] Ejecutar el DAG: `validar_marts` en verde.
+- [x] **Rojo (integración):** `tests/cierre/test_consultas.py`: el total de ingresos de `02_ventas_por_sucursal.sql` coincide con la suma de subtotales de ventas `COMPLETADA`; `03_metas_vs_ventas.sql` usa el mismo criterio.
+- [x] **Rojo (integración):** cada validación de `sql/validaciones/dag/` detecta un caso inválido preparado para ella en una copia de `marts`.
+- [x] **Verde:** aplicar los cambios de C6 de [design.md](design.md).
+- [x] Ejecutar el DAG: `validar_marts` en verde.
 
 **Verificación:** `pytest tests/cierre -k "consultas"`.
 **Commit:** `fix(p1-sql): count only completed sales and cover all facts in validations`
