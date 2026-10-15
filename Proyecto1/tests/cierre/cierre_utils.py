@@ -136,3 +136,15 @@ def dbt_run_ok(variables=None, full_refresh=False):
     res = dbt("run", variables, extra=("--full-refresh",) if full_refresh else ())
     assert res.returncode == 0, f"dbt run fallo:\n{resumen(res)}"
     return res
+
+
+def volcado_marts():
+    """Esquema de marts con pg_dump, sin las lineas restrict y unrestrict de psql (token aleatorio)."""
+    env = _leer_env()
+    res = _compose(
+        "exec", "-T", "dw", "pg_dump", "-U", env["DW_USER"], "-d", env["DW_DB"],
+        "--schema-only", "--schema=marts", "--no-owner", "--no-privileges",
+    )
+    assert res.returncode == 0, res.stderr
+    lineas = [l for l in res.stdout.splitlines() if not l.startswith((chr(92) + "restrict", chr(92) + "unrestrict"))]
+    return "\n".join(lineas).strip() + "\n"

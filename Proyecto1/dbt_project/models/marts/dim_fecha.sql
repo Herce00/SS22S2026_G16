@@ -1,3 +1,9 @@
+{{ config(
+    post_hook=[
+        "{{ clave_primaria('fecha_key') }}"
+    ]
+) }}
+
 WITH limites AS (
     SELECT
         LEAST(

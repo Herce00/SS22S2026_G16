@@ -1,3 +1,11 @@
+{{ config(
+    post_hook=[
+        "{{ clave_primaria('producto_key') }}",
+        "{{ clave_foranea('categoria_key', 'dim_categoria', 'categoria_key') }}",
+        "{{ clave_foranea('marca_key', 'dim_marca', 'marca_key') }}"
+    ]
+) }}
+
 SELECT
     {{ clave_sustituta(['p.id_producto']) }} AS producto_key,
     p.id_producto,

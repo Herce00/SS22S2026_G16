@@ -101,10 +101,10 @@ Sin código. Cada respuesta se anota en "Puntos abiertos" de [design.md](design.
 
 ## T7 — Claves físicas y DDL de referencia
 
-- [ ] **Rojo (integración):** `tests/cierre/test_restricciones.py`: tras una ejecución, cada tabla de `marts` tiene clave primaria y cada clave foránea de cada hecho existe como restricción; tras una segunda ejecución siguen existiendo.
-- [ ] **Verde:** crear `macros/restricciones.sql` y declarar los `post_hook` en dimensiones y hechos.
-- [ ] Generar `sql/ddl/referencia/03_marts_referencia.sql` con `pg_dump --schema-only`, con el encabezado de [design.md](design.md).
-- [ ] Confirmar que un reinicio limpio no ejecuta ese archivo.
+- [x] **Rojo (integración):** `tests/cierre/test_restricciones.py`: tras una ejecución, cada tabla de `marts` tiene clave primaria y cada clave foránea de cada hecho existe como restricción; tras una segunda ejecución siguen existiendo.
+- [x] **Verde:** crear `macros/restricciones.sql` y declarar los `post_hook` en dimensiones y hechos.
+- [x] Generar `sql/ddl/referencia/03_marts_referencia.sql` con `pg_dump --schema-only`, con el encabezado de [design.md](design.md).
+- [x] Confirmar que un reinicio limpio no ejecuta ese archivo.
 
 **Verificación:** `pytest tests/cierre -k "restricciones"` y dos ejecuciones del DAG en verde.
 **Commit:** `feat(p1-dbt): add physical keys to marts and reference ddl`

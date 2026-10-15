@@ -1,3 +1,9 @@
+{{ config(
+    post_hook=[
+        "{{ clave_primaria('marca_key') }}"
+    ]
+) }}
+
 SELECT
     {{ clave_sustituta(['id_marca']) }} AS marca_key,
     id_marca,

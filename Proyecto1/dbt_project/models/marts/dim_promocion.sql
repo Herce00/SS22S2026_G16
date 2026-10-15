@@ -1,3 +1,12 @@
+{{ config(
+    post_hook=[
+        "{{ clave_primaria('promocion_key') }}",
+        "{{ clave_foranea('fecha_inicio_key', 'dim_fecha', 'fecha_key') }}",
+        "{{ clave_foranea('fecha_fin_key', 'dim_fecha', 'fecha_key') }}",
+        "{{ clave_foranea('categoria_key', 'dim_categoria', 'categoria_key') }}"
+    ]
+) }}
+
 SELECT
     {{ clave_sustituta(['p.id_promocion']) }} AS promocion_key,
     p.id_promocion,

@@ -1,3 +1,11 @@
+{{ config(
+    post_hook=[
+        "{{ clave_primaria('precio_proveedor_key') }}",
+        "{{ clave_foranea('fecha_key', 'dim_fecha', 'fecha_key') }}",
+        "{{ clave_foranea('producto_key', 'dim_producto', 'producto_key') }}"
+    ]
+) }}
+
 SELECT
     MD5(CONCAT_WS('|', p.id_proveedor, p.id_producto, p.fecha_vigencia)) AS precio_proveedor_key,
     p.id_proveedor,

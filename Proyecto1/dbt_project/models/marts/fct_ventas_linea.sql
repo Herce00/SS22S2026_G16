@@ -1,7 +1,14 @@
 {{ config(
     materialized='incremental',
     unique_key='id_detalle',
-    on_schema_change='sync_all_columns'
+    on_schema_change='sync_all_columns',
+    post_hook=[
+        "{{ clave_primaria('venta_linea_key') }}",
+        "{{ clave_foranea('fecha_key', 'dim_fecha', 'fecha_key') }}",
+        "{{ clave_foranea('cliente_key', 'dim_cliente', 'cliente_key') }}",
+        "{{ clave_foranea('sucursal_key', 'dim_sucursal', 'sucursal_key') }}",
+        "{{ clave_foranea('producto_key', 'dim_producto', 'producto_key') }}"
+    ]
 ) }}
 
 SELECT
