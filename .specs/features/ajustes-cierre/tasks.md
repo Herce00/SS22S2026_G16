@@ -50,9 +50,9 @@ Sin código. Cada respuesta se anota en "Puntos abiertos" de [design.md](design.
 
 ## T2 — Prueba obsoleta del rol A
 
-- [ ] **Rojo:** confirmar que `test_models_contiene_unico_archivo_sql` falla con el proyecto actual.
-- [ ] **Verde:** reemplazarla por pruebas de lo que el rol A garantiza: existen `dbt_project.yml`, `profiles.yml` sin credenciales literales, el macro de schema y las fuentes de las 12 tablas.
-- [ ] Confirmar que ninguna otra prueba del rol A depende del contenido de los modelos.
+- [x] **Rojo:** confirmar que `test_models_contiene_unico_archivo_sql` falla con el proyecto actual.
+- [x] **Verde:** reemplazarla por pruebas de lo que el rol A garantiza: existen `dbt_project.yml`, `profiles.yml` sin credenciales literales, el macro de schema y las fuentes de las 12 tablas.
+- [x] Confirmar que ninguna otra prueba del rol A depende del contenido de los modelos.
 
 **Verificación:** `pytest tests/dag -k "esqueleto"`.
 **Commit:** `test(p1-dag): stop asserting skeleton-only dbt models`
