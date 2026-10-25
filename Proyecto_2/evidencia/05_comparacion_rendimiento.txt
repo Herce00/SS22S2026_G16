@@ -1,0 +1,241 @@
+================================================================================
+05_comparacion_rendimiento.txt
+Evidencia de T3 (feature p2-a-optimizacion): comparación de rendimiento entre
+la tabla pública, p2_a_trips.trips_2022_std y p2_a_trips.trips_2022_opt.
+Script: Proyecto_2/sql/a_02_comparacion_rendimiento.sql
+Proyecto: ss2-g16-proyecto2 (ubicación US). Fecha de ejecución: 2026-10-25.
+================================================================================
+
+--------------------------------------------------------------------------------
+Método
+--------------------------------------------------------------------------------
+- Fuentes:
+    public = bigquery-public-data.new_york_taxi_trips.tlc_yellow_trips_2022
+             (sin partición ni clustering; montos NUMERIC; incluye filas que
+             el contrato descarta)
+    std    = ss2-g16-proyecto2.p2_a_trips.trips_2022_std
+             (sin partición ni clustering; 34,796,108 filas)
+    opt    = ss2-g16-proyecto2.p2_a_trips.trips_2022_opt
+             (partición diaria por DATE(pickup_datetime), 335 particiones;
+             clustering pickup_location_id, dropoff_location_id; 34,796,108 filas)
+- La misma consulta lógica se escribe una vez por fuente; solo cambia el FROM.
+  El texto de cada una de las 12 ejecuciones coincide byte a byte con su bloque
+  [Qn-fuente] del script.
+- Cada consulta se ejecutó por separado, primero con --dry_run y luego real,
+  con --nouse_cache y --job_id=p2_cmp_q<n>_<fuente>_1792951405.
+- Las métricas reales salen de `region-us`.INFORMATION_SCHEMA.JOBS_BY_USER
+  (bloque final del script). cache_hit = false en los 12 trabajos.
+- El dry run sobre opt es una cota superior ("upper bound").
+
+--------------------------------------------------------------------------------
+Q1: poda por partición. Viajes diarios y tarifa promedio, 2022-03-07 a 2022-03-13.
+--------------------------------------------------------------------------------
+SELECT DATE(pickup_datetime) AS trip_date, COUNT(*) AS trips, ROUND(AVG(fare_amount), 2) AS avg_fare
+FROM <fuente>
+WHERE pickup_datetime >= TIMESTAMP '2022-03-07' AND pickup_datetime < TIMESTAMP '2022-03-14'
+GROUP BY trip_date
+ORDER BY trip_date;
+
+Dry run:
+  public : 870156936 bytes
+  std    : 556737728 bytes
+  opt    : upper bound of 12524080 bytes
+
+Resultado (opt):
++------------+--------+----------+
+| trip_date  | trips  | avg_fare |
++------------+--------+----------+
+| 2022-03-07 |  95781 |    13.97 |
+| 2022-03-08 | 112842 |    13.48 |
+| 2022-03-09 | 115696 |    13.62 |
+| 2022-03-10 | 120310 |     14.3 |
+| 2022-03-11 | 124481 |    14.12 |
+| 2022-03-12 | 117360 |    12.65 |
+| 2022-03-13 |  96285 |    14.44 |
++------------+--------+----------+
+Comparación: std devuelve exactamente las mismas filas (diff sin diferencias).
+public devuelve más viajes por día (por ejemplo, 99695 el 2022-03-07) porque
+no aplica los 7 filtros de limpieza del contrato.
+
+--------------------------------------------------------------------------------
+Q2: poda por clustering. Viajes mensuales y total promedio, origen 132 (JFK), todo 2022.
+--------------------------------------------------------------------------------
+SELECT EXTRACT(MONTH FROM pickup_datetime) AS trip_month, COUNT(*) AS trips, ROUND(AVG(total_amount), 2) AS avg_total
+FROM <fuente>
+WHERE pickup_location_id = '132'
+  AND pickup_datetime >= TIMESTAMP '2022-01-01' AND pickup_datetime < TIMESTAMP '2023-01-01'
+GROUP BY trip_month
+ORDER BY trip_month;
+
+Dry run:
+  public : 1045265287 bytes
+  std    : 724820124 bytes
+  opt    : upper bound of 652219669 bytes
+
+Resultado (opt):
++------------+--------+-----------+
+| trip_month | trips  | avg_total |
++------------+--------+-----------+
+|          1 |  98819 |     58.77 |
+|          2 | 101109 |     60.63 |
+|          3 | 145427 |     61.96 |
+|          4 | 152817 |     62.23 |
+|          5 | 166235 |     62.26 |
+|          6 | 160519 |     62.58 |
+|          7 | 158784 |     61.23 |
+|          8 | 169188 |      59.5 |
+|          9 | 162815 |     61.48 |
+|         10 | 179340 |     61.96 |
+|         11 | 155952 |     61.46 |
++------------+--------+-----------+
+Comparación: std devuelve exactamente las mismas filas. public devuelve más
+viajes y otros promedios (por ejemplo, mes 1: 103485 viajes, 57.71) por la
+misma razón que en Q1. Ninguna fuente tiene filas del mes 12 para esta zona.
+
+--------------------------------------------------------------------------------
+Q3: partición y clustering. Top 10 destinos con origen 161, junio de 2022.
+--------------------------------------------------------------------------------
+SELECT dropoff_location_id, COUNT(*) AS trips
+FROM <fuente>
+WHERE pickup_location_id = '161'
+  AND pickup_datetime >= TIMESTAMP '2022-06-01' AND pickup_datetime < TIMESTAMP '2022-07-01'
+GROUP BY dropoff_location_id
+ORDER BY trips DESC, dropoff_location_id
+LIMIT 10;
+
+Dry run:
+  public : 638526274 bytes
+  std    : 612835889 bytes
+  opt    : upper bound of 54522585 bytes
+
+Resultado (opt):
++---------------------+-------+
+| dropoff_location_id | trips |
++---------------------+-------+
+| 237                 |  9167 |
+| 236                 |  8286 |
+| 234                 |  5770 |
+| 164                 |  5284 |
+| 161                 |  4685 |
+| 186                 |  4671 |
+| 170                 |  4397 |
+| 141                 |  4083 |
+| 163                 |  3990 |
+| 142                 |  3781 |
++---------------------+-------+
+Comparación: std devuelve exactamente las mismas filas. public devuelve los
+mismos 10 destinos con más viajes; 161 y 164 cambian de orden (5539 y 5441).
+
+--------------------------------------------------------------------------------
+Q4: control sin filtro selectivo. Total promedio por tipo de pago, todo el año.
+--------------------------------------------------------------------------------
+SELECT payment_type, COUNT(*) AS trips, ROUND(AVG(total_amount), 2) AS avg_total
+FROM <fuente>
+GROUP BY payment_type
+ORDER BY payment_type;
+
+Dry run:
+  public : 688874241 bytes
+  std    : 382757188 bytes
+  opt    : upper bound of 382757188 bytes
+
+Resultado (opt):
++--------------+----------+-----------+
+| payment_type |  trips   | avg_total |
++--------------+----------+-----------+
+| 0            |  1169077 |     28.14 |
+| 1            | 26703778 |     22.01 |
+| 2            |  6772717 |     18.22 |
+| 3            |    85848 |     22.41 |
+| 4            |    64687 |     24.86 |
+| 5            |        1 |      11.8 |
++--------------+----------+-----------+
+Comparación: std devuelve exactamente las mismas filas. public tiene más filas
+y montos negativos que el contrato descarta (por ejemplo, payment_type 4:
+207844 viajes con promedio -1.54).
+
+--------------------------------------------------------------------------------
+Métricas reales (JOBS_BY_USER, bloque [Q-metricas] del script)
+--------------------------------------------------------------------------------
+Dry run: upper bound of 1635205 bytes of data.
+
++-----------------------------+-----------------------+--------------------+---------------+------------+-----------+
+|           job_id            | total_bytes_processed | total_bytes_billed | total_slot_ms | elapsed_ms | cache_hit |
++-----------------------------+-----------------------+--------------------+---------------+------------+-----------+
+| p2_cmp_q1_opt_1792951405    |              12524080 |           12582912 |           304 |        273 |     false |
+| p2_cmp_q1_public_1792951405 |             870156936 |          870318080 |          3009 |        460 |     false |
+| p2_cmp_q1_std_1792951405    |             556737728 |          556793856 |         22832 |        624 |     false |
+| p2_cmp_q2_opt_1792951405    |             652219669 |          653262848 |         22086 |        707 |     false |
+| p2_cmp_q2_public_1792951405 |            1045265287 |         1045430272 |          5649 |        405 |     false |
+| p2_cmp_q2_std_1792951405    |             724820124 |          725614592 |         27536 |        937 |     false |
+| p2_cmp_q3_opt_1792951405    |              54522585 |           54525952 |           666 |        230 |     false |
+| p2_cmp_q3_public_1792951405 |             638526274 |          638582784 |          2103 |        362 |     false |
+| p2_cmp_q3_std_1792951405    |             612835889 |          613416960 |          9549 |        487 |     false |
+| p2_cmp_q4_opt_1792951405    |             382757188 |          383778816 |         12585 |        528 |     false |
+| p2_cmp_q4_public_1792951405 |             688874241 |          688914432 |          4259 |        367 |     false |
+| p2_cmp_q4_std_1792951405    |             382757188 |          383778816 |         10753 |        557 |     false |
++-----------------------------+-----------------------+--------------------+---------------+------------+-----------+
+
+--------------------------------------------------------------------------------
+Sondas de dry run para aislar el clustering (sin ejecución real, 0 bytes facturados)
+--------------------------------------------------------------------------------
+- SELECT COUNT(*) FROM <fuente> WHERE pickup_location_id='132'
+    std: 168082396 bytes; opt: upper bound of 151731525 bytes (-9.73 %).
+    SELECT pickup_location_id FROM <fuente>, sin filtro: 168082396 bytes en ambas.
+- Q3 en opt con el mismo rango de junio y sin filtro de pickup_location_id:
+    upper bound of 60098566 bytes; con el filtro '161': 54522585 (-9.28 %).
+
+--------------------------------------------------------------------------------
+Resumen: bytes procesados reales y reducción de opt
+--------------------------------------------------------------------------------
+| Q  | Fuente | Bytes procesados | Bytes facturados | Slot ms | Duración ms | opt vs std | opt vs public |
+|----|--------|-----------------:|-----------------:|--------:|------------:|-----------:|--------------:|
+| Q1 | public |      870,156,936 |      870,318,080 |   3,009 |         460 |            |               |
+| Q1 | std    |      556,737,728 |      556,793,856 |  22,832 |         624 |            |               |
+| Q1 | opt    |       12,524,080 |       12,582,912 |     304 |         273 |   -97.75 % |      -98.56 % |
+| Q2 | public |    1,045,265,287 |    1,045,430,272 |   5,649 |         405 |            |               |
+| Q2 | std    |      724,820,124 |      725,614,592 |  27,536 |         937 |            |               |
+| Q2 | opt    |      652,219,669 |      653,262,848 |  22,086 |         707 |   -10.02 % |      -37.60 % |
+| Q3 | public |      638,526,274 |      638,582,784 |   2,103 |         362 |            |               |
+| Q3 | std    |      612,835,889 |      613,416,960 |   9,549 |         487 |            |               |
+| Q3 | opt    |       54,522,585 |       54,525,952 |     666 |         230 |   -91.10 % |      -91.46 % |
+| Q4 | public |      688,874,241 |      688,914,432 |   4,259 |         367 |            |               |
+| Q4 | std    |      382,757,188 |      383,778,816 |  10,753 |         557 |            |               |
+| Q4 | opt    |      382,757,188 |      383,778,816 |  12,585 |         528 |     0.00 % |      -44.44 % |
+
+Total procesado por los 12 trabajos: 6,621,997,189 bytes (6.17 GiB).
+
+--------------------------------------------------------------------------------
+Resultado
+--------------------------------------------------------------------------------
+- Q1 (partición): opt procesa un 97.75 % menos que std. Solo lee las 7
+  particiones de la semana (cumple).
+- Q2 (clustering): opt procesa un 10.02 % menos que std, sin poda por
+  partición posible (cumple, efecto moderado). La poda por clustering sí
+  aparece en los bytes reales, pero el dry run de opt ya la refleja: los bytes
+  reales son iguales a la cota superior estimada en los 12 trabajos. La sonda
+  del filtro pickup_location_id='132' (-9.73 %) muestra que la reducción viene
+  del clustering y no de las columnas. Hipótesis no verificada: la reducción
+  es pequeña porque cada partición diaria es chica (4.28 GiB / 335 ≈ 13 MiB
+  lógicos), así que hay pocos bloques que descartar dentro de cada partición.
+- Q3 (ambas): opt procesa un 91.10 % menos que std. La partición deja 60.1 MB
+  y el clustering quita otro 9.28 % (cumple). La reducción relativa es menor
+  que en Q1 porque un mes cubre más particiones que una semana; lo esperado
+  ("la mayor reducción") no se cumplió frente a Q1.
+- Q4 (control): opt y std procesan los mismos 382,757,188 bytes. Sin filtro
+  selectivo no hay ninguna reducción, como se esperaba.
+- std frente a public: std procesa menos en todas las consultas (-4.02 % a
+  -44.44 %). La causa más probable es que public tiene unos 36.26 millones de
+  filas y guarda los montos como NUMERIC (16 bytes por valor), mientras std
+  tiene 34,796,108 filas y montos FLOAT64 (8 bytes). En Q1, por ejemplo,
+  36.26 M filas x (8 + 16) bytes ≈ 870 MB, igual al valor medido. Esta parte
+  de la diferencia viene del esquema limpio, no de la optimización.
+- Slot ms y duración: opt baja en Q1 (304 frente a 22,832 slot ms en std) y
+  Q3 (666 frente a 9,549). Las duraciones son todas menores de 1 s y varían
+  entre corridas, así que no se toman como métrica principal. public consume
+  menos slot ms que std en las 4 consultas pese a leer más bytes; no se
+  investigó la causa.
+- Facturación mínima de 10 MB: no se ve en estas corridas. La consulta más
+  barata (Q1-opt) facturó 12,582,912 bytes (12 MiB), por encima del mínimo; los
+  bytes facturados se redondean al MiB siguiente.
+- cache_hit = false en los 12 trabajos.
