@@ -88,3 +88,8 @@ desktop.ini
 
 # Logs
 *.log
+
+# Material local no versionado (guias del proyecto 1 y PDF original del enunciado del proyecto 2)
+Proyecto1/GUIA_CALIFICACION_DEFENSA.md
+Proyecto1/GUIA_PRESENTACION.md
+Proyecto_2/798_Proyecto_2_2S2026.docx.pdf
