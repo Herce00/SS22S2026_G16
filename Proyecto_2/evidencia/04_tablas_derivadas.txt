@@ -1,0 +1,109 @@
+================================================================================
+04_tablas_derivadas.txt
+Evidencia de T2 (feature p2-a-optimizacion): creación y metadatos de
+p2_a_trips.trips_2022_opt y p2_a_trips.trips_2022_std.
+Script: Proyecto_2/sql/a_01_tablas_derivadas.sql
+Proyecto: ss2-g16-proyecto2 (ubicación US). Fecha de ejecución: 2026-10-25.
+================================================================================
+
+--------------------------------------------------------------------------------
+Trabajos CTAS (bq show -j)
+--------------------------------------------------------------------------------
+Bloque 1: trips_2022_opt
+  job_id               : bqjob_r7e244b7ac5e7469b_000001a1742c2631_1
+  statementType        : CREATE_TABLE_AS_SELECT
+  destino              : ss2-g16-proyecto2:p2_a_trips.trips_2022_opt
+  totalBytesProcessed  : 4501953419
+  totalBytesBilled     : 4502585344
+  inicio (UTC)         : 2026-10-25T17:46:53Z
+  duración             : 11.248 s
+  estado               : DONE
+
+Bloque 2: trips_2022_std
+  job_id               : bqjob_r75207bf7118620ee_000001a1742c8f0b_1
+  statementType        : CREATE_TABLE_AS_SELECT
+  destino              : ss2-g16-proyecto2:p2_a_trips.trips_2022_std
+  totalBytesProcessed  : 4599289734
+  totalBytesBilled     : 4600102912
+  inicio (UTC)         : 2026-10-25T17:47:19Z
+  duración             : 3.081 s
+  estado               : DONE
+
+El texto de configuration.query.query de ambos trabajos coincide byte a byte
+con los bloques 1 y 2 del script.
+
+--------------------------------------------------------------------------------
+(a) Filas de cada tabla. Esperado: 34,796,108 en ambas.
+--------------------------------------------------------------------------------
+Dry run: upper bound of 0 bytes of data.
+
++----------------+-----------+
+|   table_name   | row_count |
++----------------+-----------+
+| trips_2022_opt |  34796108 |
+| trips_2022_std |  34796108 |
++----------------+-----------+
+
+--------------------------------------------------------------------------------
+(b) Filas y bytes lógicos según __TABLES__. Esperado: 34,796,108 filas en ambas.
+--------------------------------------------------------------------------------
+Dry run: 0 bytes of data.
+
++----------------+------------+---------------------+-------------------+
+|    table_id    | total_rows | total_logical_bytes | total_logical_gib |
++----------------+------------+---------------------+-------------------+
+| trips_2022_opt |   34796108 |          4599289734 |              4.28 |
+| trips_2022_std |   34796108 |          4599289734 |              4.28 |
++----------------+------------+---------------------+-------------------+
+
+--------------------------------------------------------------------------------
+(c) Particiones de trips_2022_opt (INFORMATION_SCHEMA.PARTITIONS). Esperado: unas 335 diarias.
+--------------------------------------------------------------------------------
+Dry run: 10485760 bytes of data.
+
++-----------------+------------------+------------------+------------+
+| partition_count | min_partition_id | max_partition_id | total_rows |
++-----------------+------------------+------------------+------------+
+|             335 | 20220101         | 20221201         |   34796108 |
++-----------------+------------------+------------------+------------+
+
+--------------------------------------------------------------------------------
+(d) Columnas de clustering y partición (INFORMATION_SCHEMA.COLUMNS). Esperado: opt con pickup_location_id=1, dropoff_location_id=2 y partición por pickup_datetime; std sin filas.
+--------------------------------------------------------------------------------
+Dry run: 10485760 bytes of data.
+
++----------------+---------------------+-----------------------------+------------------------+
+|   table_name   |     column_name     | clustering_ordinal_position | is_partitioning_column |
++----------------+---------------------+-----------------------------+------------------------+
+| trips_2022_opt | pickup_datetime     |                        NULL | YES                    |
+| trips_2022_opt | pickup_location_id  |                           1 | NO                     |
+| trips_2022_opt | dropoff_location_id |                           2 | NO                     |
++----------------+---------------------+-----------------------------+------------------------+
+
+--------------------------------------------------------------------------------
+(e) Equivalencia entre trips_2022_opt y la vista del contrato en fase 1 (COUNT(*) y BIT_XOR(trip_id)). Esperado: iguales.
+--------------------------------------------------------------------------------
+Dry run: upper bound of 3336148531 bytes of data.
+Bytes reales (bq show -j bqjob_r196935e7eb66dff4_000001a1743009dc_1): totalBytesProcessed 3336148531, totalBytesBilled 3336568832.
+
++----------------+-----------+----------------------+
+|     source     | row_count |     trip_id_xor      |
++----------------+-----------+----------------------+
+| trips_2022_opt |  34796108 | -1231773054350036881 |
+| v_trips_clean  |  34796108 | -1231773054350036881 |
++----------------+-----------+----------------------+
+
+--------------------------------------------------------------------------------
+Resultado
+--------------------------------------------------------------------------------
+- Filas: 34,796,108 en opt y en std (cumple).
+- Bytes lógicos: 4,599,289,734 (4.28 GiB) en ambas tablas.
+- Particiones de opt: 335 diarias, de 20220101 a 20221201, sin partición
+  __NULL__; la suma de filas por partición es 34,796,108 (cumple). Del
+  2022-01-01 al 2022-12-01 hay exactamente 335 días, así que no faltan días
+  intermedios; después del 2022-12-01 no queda ningún viaje limpio.
+- Clustering de opt: pickup_location_id (1), dropoff_location_id (2); partición
+  por pickup_datetime. std no tiene columnas de partición ni de clustering
+  (cumple).
+- Equivalencia con v_trips_clean (fase 1): mismo conteo y mismo BIT_XOR de
+  trip_id, -1231773054350036881 (cumple).
