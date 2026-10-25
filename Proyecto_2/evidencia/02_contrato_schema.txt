@@ -1,0 +1,25 @@
+# Validación (b): esquema de ss2-g16-proyecto2.p2_contract.v_trips_clean desde INFORMATION_SCHEMA.COLUMNS
+# Script: Proyecto_2/sql/contract/02_validaciones_contrato.sql. Dry run: 10485760 bytes procesados
++------------------+---------------------+-----------+
+| ordinal_position |     column_name     | data_type |
++------------------+---------------------+-----------+
+|                1 | trip_id             | INT64     |
+|                2 | vendor_id           | STRING    |
+|                3 | pickup_datetime     | TIMESTAMP |
+|                4 | dropoff_datetime    | TIMESTAMP |
+|                5 | pickup_date         | DATE      |
+|                6 | pickup_hour         | INT64     |
+|                7 | pickup_dow          | INT64     |
+|                8 | pickup_month        | INT64     |
+|                9 | trip_duration_min   | FLOAT64   |
+|               10 | passenger_count     | INT64     |
+|               11 | trip_distance       | FLOAT64   |
+|               12 | rate_code           | STRING    |
+|               13 | payment_type        | STRING    |
+|               14 | fare_amount         | FLOAT64   |
+|               15 | tip_amount          | FLOAT64   |
+|               16 | tolls_amount        | FLOAT64   |
+|               17 | total_amount        | FLOAT64   |
+|               18 | pickup_location_id  | STRING    |
+|               19 | dropoff_location_id | STRING    |
++------------------+---------------------+-----------+
