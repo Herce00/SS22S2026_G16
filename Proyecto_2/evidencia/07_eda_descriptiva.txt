@@ -1,0 +1,157 @@
+================================================================================
+07_eda_descriptiva.txt
+Evidencia de T2 (feature p2-a-eda): análisis exploratorio descriptivo.
+Script: Proyecto_2/sql/a_03_eda_descriptiva.sql
+Fuente: ss2-g16-proyecto2.p2_a_trips.trips_2022_opt (decisión E1).
+Proyecto: ss2-g16-proyecto2 (ubicación US). Fecha de ejecución: 2026-10-25.
+================================================================================
+
+--------------------------------------------------------------------------------
+Método
+--------------------------------------------------------------------------------
+- Cada consulta se extrajo de su bloque [Dn] del script a un archivo propio,
+  así que el texto ejecutado coincide byte a byte con el bloque.
+- Cada consulta se ejecutó primero con --dry_run y luego real, con
+  --format=pretty. Se quitaron las líneas "Waiting on bqjob".
+- El dry run sobre opt es una cota superior ("upper bound"). Ninguna consulta
+  supera el límite de 10 GB; la mayor estima 1,391,844,320 bytes.
+- Los percentiles salen de APPROX_QUANTILES(x, 100) y son aproximados.
+
+--------------------------------------------------------------------------------
+D1: volumen y totales generales.
+Pregunta: ¿cuántos viajes hay, cuántos días cubren y cuánto suman el ingreso,
+las tarifas, las propinas y la distancia?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 1391844320 bytes.
+
++----------+---------------+------------+------------+-------------------+---------------+--------------+-------------+-------------------+
+|  trips   | distinct_days | first_day  |  last_day  | avg_trips_per_day | total_revenue | total_fares  | total_tips  | total_distance_mi |
++----------+---------------+------------+------------+-------------------+---------------+--------------+-------------+-------------------+
+| 34796108 |           335 | 2022-01-01 | 2022-12-01 |          103869.0 |  747517061.02 | 509646615.43 | 95230985.21 |      123830611.15 |
++----------+---------------+------------+------------+-------------------+---------------+--------------+-------------+-------------------+
+
+Control: trips = 34,796,108, igual al total de filas de opt (cumple).
+
+--------------------------------------------------------------------------------
+D2: estadísticas descriptivas por métrica numérica.
+Pregunta: ¿cómo se distribuyen distancia, duración, tarifa, propina y total, y
+qué tan larga es la cola derecha?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 1391844320 bytes.
+
++-------------------+----------+-------+--------+--------+------+-------+-------+-------+-------+-----------+
+|      metric       |    n     |  avg  | stddev |  min   | p25  |  p50  |  p75  |  p95  |  p99  |    max    |
++-------------------+----------+-------+--------+--------+------+-------+-------+-------+-------+-----------+
+| trip_distance     | 34796108 |  3.56 |   4.47 |   0.01 | 1.15 |  1.91 |   3.6 | 15.25 | 20.18 |     99.89 |
+| trip_duration_min | 34796108 | 15.79 |  12.72 |   0.02 | 7.55 |  12.3 | 19.77 | 40.55 | 63.93 |    360.97 |
+| fare_amount       | 34796108 | 14.65 |  96.86 |   0.01 |  7.0 |  10.0 |  16.0 |  52.0 |  57.0 | 401092.32 |
+| tip_amount        | 34796108 |  2.74 |   3.15 | -16.47 |  1.0 |  2.16 |  3.36 |  8.96 | 13.86 |   1400.16 |
+| total_amount      | 34796108 | 21.48 |   97.4 |   0.31 | 12.3 | 15.96 |  22.8 | 61.85 | 79.62 | 401095.62 |
++-------------------+----------+-------+--------+--------+------+-------+-------+-------+-------+-----------+
+
+n = 34,796,108 en las cinco métricas: ninguna tiene nulos.
+
+--------------------------------------------------------------------------------
+D3: velocidad media derivada (mph).
+Pregunta: ¿a qué velocidad se mueven los taxis y cuántos viajes registran una
+velocidad físicamente implausible (más de 80 mph)?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 556737728 bytes.
+
++----------+---------------------+------------------+---------+------------+---------+---------+---------+---------+---------+---------+------------------+----------------+
+|  trips   | excluded_under_1min | trips_with_speed | avg_mph | stddev_mph | p25_mph | p50_mph | p75_mph | p95_mph | p99_mph | max_mph | trips_over_80mph | pct_over_80mph |
++----------+---------------------+------------------+---------+------------+---------+---------+---------+---------+---------+---------+------------------+----------------+
+| 34796108 |              142435 |         34653673 |   12.11 |       7.38 |    7.88 |   10.38 |    14.2 |   25.69 |   36.07 | 3633.16 |             2306 |         0.0067 |
++----------+---------------------+------------------+---------+------------+---------+---------+---------+---------+---------+---------+------------------+----------------+
+
+Control: 142,435 + 34,653,673 = 34,796,108 (cumple). Los 2,306 viajes de más
+de 80 mph se reportan y no se filtran.
+
+--------------------------------------------------------------------------------
+D4: participación por tramo de distancia.
+Pregunta: ¿qué proporción de los viajes es corta, media o larga y cuánto cuesta
+en promedio cada tramo?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 835106592 bytes.
+
++---------------+----------+-----------+----------+-----------+
+| distance_band |  trips   | pct_trips | avg_fare | avg_total |
++---------------+----------+-----------+----------+-----------+
+| 1 [0, 1)      |  6485787 |     18.64 |     6.06 |     10.97 |
+| 2 [1, 3)      | 17493943 |     50.28 |     9.72 |      15.3 |
+| 3 [3, 5)      |  4629548 |      13.3 |     16.4 |     22.97 |
+| 4 [5, 10)     |  3218716 |      9.25 |    25.11 |     34.48 |
+| 5 [10, 20)    |  2585939 |      7.43 |     45.9 |     61.55 |
+| 6 [20, +)     |   382175 |       1.1 |    65.14 |     84.14 |
++---------------+----------+-----------+----------+-----------+
+
+Control: 6,485,787 + 17,493,943 + 4,629,548 + 3,218,716 + 2,585,939 + 382,175
+= 34,796,108 (cumple).
+
+--------------------------------------------------------------------------------
+D5: tarifa por milla según tramo de distancia.
+Pregunta: ¿cuánto se paga por milla en viajes cortos frente a viajes largos
+(efecto del costo fijo)?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 556737728 bytes.
+
++---------------+----------+-----------------+-------------------+-------------------+---------------------+
+| distance_band |  trips   | avg_distance_mi | fare_per_mile_agg | p50_fare_per_mile | zero_distance_trips |
++---------------+----------+-----------------+-------------------+-------------------+---------------------+
+| 1 [0, 1)      |  6485787 |            0.69 |              8.77 |              7.69 |                   0 |
+| 2 [1, 3)      | 17493943 |            1.78 |              5.45 |              5.36 |                   0 |
+| 3 [3, 5)      |  4629548 |            3.78 |              4.34 |              4.18 |                   0 |
+| 4 [5, 10)     |  3218716 |            7.12 |              3.53 |              3.42 |                   0 |
+| 5 [10, 20)    |  2585939 |           14.97 |              3.07 |              2.97 |                   0 |
+| 6 [20, +)     |   382175 |           23.59 |              2.76 |              2.55 |                   0 |
++---------------+----------+-----------------+-------------------+-------------------+---------------------+
+
+Los conteos por tramo coinciden con D4. No hay viajes con distancia 0, así que
+la mediana por viaje no excluye ninguna fila.
+
+--------------------------------------------------------------------------------
+D6: nulos en passenger_count.
+Pregunta: ¿cuántos viajes no registran el número de pasajeros y cuántos
+registran cero?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 269016248 bytes.
+
++----------+----------------------+----------+----------------------+----------+
+|  trips   | null_passenger_count | pct_null | zero_passenger_count | pct_zero |
++----------+----------------------+----------+----------------------+----------+
+| 34796108 |              1169077 |     3.36 |                    0 |      0.0 |
++----------+----------------------+----------+----------------------+----------+
+
+--------------------------------------------------------------------------------
+Controles de consistencia
+--------------------------------------------------------------------------------
+- D1: trips = 34,796,108 (cumple).
+- D4: la suma de los seis tramos = 34,796,108 (cumple).
+
+--------------------------------------------------------------------------------
+Hallazgos
+--------------------------------------------------------------------------------
+- [D1] Los 34,796,108 viajes cubren 335 días, del 2022-01-01 al 2022-12-01:
+  diciembre aparece con un solo día. Suman USD 747,517,061.02 de ingreso total,
+  USD 509,646,615.43 de tarifas y USD 95,230,985.21 de propinas (18.69 % de
+  las tarifas), con un promedio de 103,869 viajes por día.
+- [D2] Las distribuciones tienen sesgo a la derecha: la distancia media es
+  3.56 mi y la mediana 1.91 mi; el total medio es USD 21.48 y la mediana
+  USD 15.96. fare_amount llega a USD 401,092.32 y tiene una desviación
+  estándar de 96.86 frente a una media de 14.65, lo que indica valores
+  extremos aislados. tip_amount tiene un mínimo negativo (-16.47).
+- [D2] En fare_amount, p95 = 52.0 y p99 = 57.0: la cola se concentra cerca
+  de USD 52. Coincide con la tarifa fija al aeropuerto JFK vigente en 2022
+  (hipótesis); se puede contrastar en T3 con rate_code.
+- [D3] La velocidad mediana es 10.38 mph y la media 12.11 mph (p95 = 25.69,
+  p99 = 36.07), sin contar 142,435 viajes de menos de 1 minuto. 2,306 viajes
+  (0.0067 %) superan 80 mph y el máximo es 3,633.16 mph: son valores
+  físicamente implausibles que se reportan sin filtrar.
+- [D4, D5] El 68.92 % de los viajes recorre menos de 3 millas (18.64 % menos
+  de 1 mi y 50.28 % entre 1 y 3 mi); solo el 1.10 % supera 20 mi. La tarifa
+  por milla baja de 8.77 USD/mi en el tramo [0, 1) a 2.76 USD/mi en el tramo
+  de 20 mi o más, lo que es consistente con un cargo fijo inicial.
+- [D6] 1,169,077 viajes (3.36 %) tienen passenger_count nulo y ninguno
+  registra 0 pasajeros. La cifra es idéntica al número de viajes con
+  payment_type 0 (05_comparacion_rendimiento.txt, Q4); la relación se
+  caracteriza en T3.

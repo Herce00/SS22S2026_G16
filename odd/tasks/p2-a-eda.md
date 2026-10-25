@@ -48,8 +48,8 @@ Responder con SQL las preguntas exploratorias del enunciado (métricas descripti
 
 | ID | Tarea | Ruta de ejecución | Estado |
 |----|-------|-------------------|--------|
-| T1 | Este plan | Inline: un documento | [ ] |
-| T2 | `Proyecto_2/sql/a_03_eda_descriptiva.sql`: volumen, `AVG`, `STDDEV` y percentiles (`APPROX_QUANTILES`) de distancia, duración, tarifa, propina y total, y velocidad media derivada. Evidencia `07_eda_descriptiva.txt` | Writer delegado. Disparador: SQL no trivial con ejecución y evidencia | [ ] |
+| T1 | Este plan | Inline: un documento | [x] `cb438ac` |
+| T2 | `Proyecto_2/sql/a_03_eda_descriptiva.sql`: volumen, `AVG`, `STDDEV` y percentiles (`APPROX_QUANTILES`) de distancia, duración, tarifa, propina y total, y velocidad media derivada. Evidencia `07_eda_descriptiva.txt` | Writer delegado. Disparador: SQL no trivial con ejecución y evidencia | [x] |
 | T3 | `Proyecto_2/sql/a_04_eda_categorica.sql`: distribución por `payment_type` (incluida la investigación del código `0`), `rate_code`, `passenger_count` y `vendor_id`; top 10 de zonas de origen y destino con nombre y borough; tasa de propina con tarjeta. Evidencia `08_eda_categorica.txt` | Writer delegado (el mismo) | [ ] |
 | T4 | `Proyecto_2/sql/a_05_eda_temporal.sql`: viajes e ingreso por hora, día de la semana y mes; matriz hora × día; tendencia diaria con media móvil de 7 días (función de ventana); velocidad media por hora. Evidencia `09_eda_temporal.txt` | Writer delegado (el mismo) | [ ] |
 | T5 | `Proyecto_2/sql/a_06_vistas_eda.sql`: `v_eda_tendencia_diaria`, `v_eda_hora_dia`, `v_eda_zonas` y `v_eda_pagos`, con el dry run de cada una. Evidencia `10_vistas_eda.txt` con un resumen de hallazgos | Writer delegado (el mismo) | [ ] |
@@ -75,7 +75,8 @@ Responder con SQL las preguntas exploratorias del enunciado (métricas descripti
 
 | ID | Commit | Evidencia | Revisión |
 |----|--------|-----------|----------|
+| T2 | Este commit | `07_eda_descriptiva.txt`: 34,796,108 viajes en 335 días (2022-01-01 a 2022-12-01), ingreso USD 747,517,061.02; mediana de distancia 1.91 mi (p99 20.18), de total USD 15.96 (p99 79.62); velocidad mediana 10.38 mph y 2,306 viajes > 80 mph; 68.92 % de viajes < 3 mi; tarifa por milla de 8.77 a 2.76 USD/mi; 1,169,077 nulos en `passenger_count` (3.36 %). Controles D1 y D4 = 34,796,108 | Pendiente de `assess` |
 
 ## Siguiente paso
 
-T2: EDA descriptiva.
+T3: EDA categórica (`a_04_eda_categorica.sql`), incluida la relación entre `payment_type` 0 y `passenger_count` nulo (ambos con 1,169,077 viajes).
