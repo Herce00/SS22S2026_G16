@@ -42,8 +42,8 @@ Primera parte independiente de Persona A: preparar la base en GCP y publicar la 
 | T1 | Steering y plan: `architecture.md`, `conventions.md`, este documento y `enunciado.md` como fuente | Writer delegado. Disparador: 3 documentos no triviales | [x] `bf93421` |
 | T2 | `Proyecto_2/sql/contract/00_datasets.sql`: crear los 3 datasets en `US`, ejecutarlo y guardar evidencia | Inline: un archivo mecánico | [x] |
 | T3 | `Proyecto_2/sql/contract/01_v_trips_clean.sql`: vista del contrato, fase 1. Validaciones en `Proyecto_2/sql/contract/02_validaciones_contrato.sql` | Writer delegado. Disparador: 2 archivos SQL no triviales más ejecución | [x] |
-| T4 | Dar a B lectura sobre `p2_contract` y escritura sobre `p2_b_ml` | Por definir | [ ] **Bloqueada:** falta el correo de B |
-| T5 | Avisar a B con un mensaje breve que resuma el contrato | Por definir | [ ] |
+| T4 | Dar a B lectura sobre `p2_contract` y escritura sobre `p2_b_ml` | Diferida | [-] **Diferida al cierre de A** (decisión del usuario, 2026-10-25): el acceso de B se otorga cuando A termine todas sus tareas |
+| T5 | Avisar a B con un mensaje breve que resuma el contrato | Diferida | [-] **Diferida al cierre de A**, junto con T4 |
 
 ## Criterios de aceptación
 
@@ -72,4 +72,4 @@ Primera parte independiente de Persona A: preparar la base en GCP y publicar la 
 
 ## Siguiente paso
 
-T4 (bloqueada por el correo de B) y T5.
+Feature cerrada para A. T4 y T5 pasan a la feature final de entrega a B. Siguiente feature de A: optimización (`trips_2022_std` vs `trips_2022_opt`) y fase 2 del contrato.
