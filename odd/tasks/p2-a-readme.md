@@ -35,14 +35,15 @@ Redactar en `Proyecto_2/README.md` todas las secciones técnicas correspondiente
 | ID | Tarea | Ruta de ejecución | Estado |
 |----|-------|-------------------|--------|
 | T1 | Este plan | Inline: un documento | [x] Este commit |
-| T2 | Redacción técnica de las secciones de Persona A en `Proyecto_2/README.md` | Writer delegado | [ ] |
+| T2 | Redacción técnica de las secciones de Persona A en `Proyecto_2/README.md` | Writer delegado | [x] |
 
 ## Progreso y evidencia
 
 | ID | Commit | Evidencia | Revisión |
 |----|--------|-----------|----------|
 | T1 | `2954ed9` | `odd/tasks/p2-a-readme.md` | Omitido (plan) |
+| T2 | Este commit | `Proyecto_2/README.md`: carátula, arquitectura, dataset (36.26M filas / 7.49 GB, 335 días), saneamiento (34,796,108 filas, -4.03 %), optimización (particiones diarias + clustering), comparación formal de rendimiento (Q1 -97.75 %, Q3 -91.10 %), síntesis integral de hallazgos en 5 ejes cuantitativos, catálogo de 4 vistas analíticas y estructura preparada para Persona B | Pendiente |
 
 ## Siguiente paso
 
-T2: Redacción técnica de `Proyecto_2/README.md` con las secciones de Persona A.
+Feature de entrega a Persona B (César): configuración IAM y mensaje de entrega.
