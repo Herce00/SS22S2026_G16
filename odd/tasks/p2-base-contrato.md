@@ -39,8 +39,8 @@ Primera parte independiente de Persona A: preparar la base en GCP y publicar la 
 
 | ID | Tarea | Ruta de ejecución | Estado |
 |----|-------|-------------------|--------|
-| T1 | Steering y plan: `architecture.md`, `conventions.md`, este documento y `enunciado.md` como fuente | Writer delegado. Disparador: 3 documentos no triviales | [ ] |
-| T2 | `Proyecto_2/sql/contract/00_datasets.sql`: crear los 3 datasets en `US`, ejecutarlo y guardar evidencia | Por definir | [ ] |
+| T1 | Steering y plan: `architecture.md`, `conventions.md`, este documento y `enunciado.md` como fuente | Writer delegado. Disparador: 3 documentos no triviales | [x] `c72ef2a` |
+| T2 | `Proyecto_2/sql/contract/00_datasets.sql`: crear los 3 datasets en `US`, ejecutarlo y guardar evidencia | Inline: un archivo mecánico | [x] |
 | T3 | `Proyecto_2/sql/contract/01_v_trips_clean.sql`: vista del contrato, fase 1. Validaciones en `Proyecto_2/sql/contract/02_validaciones_contrato.sql` | Por definir | [ ] |
 | T4 | Dar a B lectura sobre `p2_contract` y escritura sobre `p2_b_ml` | Por definir | [ ] **Bloqueada:** falta el correo de B |
 | T5 | Avisar a B con un mensaje breve que resuma el contrato | Por definir | [ ] |
@@ -66,8 +66,9 @@ Primera parte independiente de Persona A: preparar la base en GCP y publicar la 
 
 | ID | Commit | Evidencia | Revisión |
 |----|--------|-----------|----------|
-| T1 | Pendiente | Lectura estructural de los cuatro archivos | Pendiente |
+| T1 | `c72ef2a079abbbefe090950be4af22ea55eb986f` | Lectura estructural de los cuatro archivos; commit con 4 archivos y 407 inserciones | `passive` (`non_executable_only`): no requiere revisión; el límite revisado avanza a `c72ef2a` |
+| T2 | `feat(p2-contract)`: crear datasets (ver `git log`) | `Proyecto_2/evidencia/01_datasets.txt`: los 3 datasets en `US` según `INFORMATION_SCHEMA.SCHEMATA`. Se corrigió el encoding de la descripción de `p2_contract` con `PYTHONUTF8=1` | Pendiente de `assess` |
 
 ## Siguiente paso
 
-T2: escribir y ejecutar `00_datasets.sql`.
+T3: escribir la vista del contrato `01_v_trips_clean.sql` y sus validaciones.

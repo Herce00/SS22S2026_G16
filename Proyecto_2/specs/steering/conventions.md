@@ -29,10 +29,12 @@ Reglas de trabajo para ambos integrantes. Arquitectura, zonas y contrato: [archi
 Git Bash rompe `bq` y los backticks. El archivo se pasa por `cmd`:
 
 ```bash
-cmd //c "bq --project_id=ss2-g16-proyecto2 query --use_legacy_sql=false < Proyecto_2/sql/<archivo>.sql"
+cmd //c "set PYTHONUTF8=1&& bq --project_id=ss2-g16-proyecto2 query --use_legacy_sql=false < Proyecto_2\sql\<ruta>\<archivo>.sql"
 ```
 
-Se usa la configuración de gcloud `ss2-p2`.
+- `PYTHONUTF8=1` es obligatorio: sin esa variable, `bq` lee el archivo como cp1252 y los textos con tildes quedan corruptos (por ejemplo, «común» se guarda como «comÃºn»).
+- La ruta del redireccionamiento usa `\` porque la interpreta `cmd`.
+- Se usa la configuración de gcloud `ss2-p2`.
 
 ## Control de costos
 
