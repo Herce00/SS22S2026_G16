@@ -49,7 +49,7 @@ Crear las tablas derivadas de A, una estándar y una optimizada (particionada po
 | ID | Tarea | Ruta de ejecución | Estado |
 |----|-------|-------------------|--------|
 | T1 | Este plan y el renombre de la rama | Inline: un documento | [x] `8e6be84` |
-| T2 | `Proyecto_2/sql/a_01_tablas_derivadas.sql`: `trips_2022_opt` (limpieza, partición y clustering) y `trips_2022_std`. Evidencia de metadatos: filas, bytes, número de particiones y campos de clustering | Writer delegado. Disparador: SQL no trivial con ejecución y evidencia | [x] (commit de T2) |
+| T2 | `Proyecto_2/sql/a_01_tablas_derivadas.sql`: `trips_2022_opt` (limpieza, partición y clustering) y `trips_2022_std`. Evidencia de metadatos: filas, bytes, número de particiones y campos de clustering | Writer delegado. Disparador: SQL no trivial con ejecución y evidencia | [x] `dccf8b0` |
 | T3 | `Proyecto_2/sql/a_02_comparacion_rendimiento.sql`: 3 o 4 consultas representativas sobre la tabla pública, `std` y `opt`, con métricas reales de `JOBS_BY_USER` | Writer delegado (mismo writer) | [ ] |
 | T4 | Fase 2 del contrato: `01_v_trips_clean.sql` lee de `trips_2022_opt`; se vuelve a ejecutar `02_validaciones_contrato.sql` y se compara con la fase 1 | Writer delegado (mismo writer) | [ ] |
 
@@ -73,7 +73,7 @@ Crear las tablas derivadas de A, una estándar y una optimizada (particionada po
 
 | ID | Commit | Evidencia | Revisión |
 |----|--------|-----------|----------|
-| T2 | Commit `feat: crea tablas derivadas std y optimizada` (el hash se anota al cerrar T2) | [04_tablas_derivadas.txt](../../Proyecto_2/evidencia/04_tablas_derivadas.txt): 34,796,108 filas en `opt` y `std`; 4,599,289,734 bytes lógicos (4.28 GiB) en cada una; `opt` con 335 particiones diarias (20220101 a 20221201, sin `__NULL__`) y clustering `pickup_location_id` (1), `dropoff_location_id` (2); `std` sin partición ni clustering; mismo `BIT_XOR(trip_id)` que la vista de fase 1. CTAS: `opt` 4,501,953,419 bytes procesados, `std` 4,599,289,734 | Pendiente de `assess` |
+| T2 | `dccf8b0` | [04_tablas_derivadas.txt](../../Proyecto_2/evidencia/04_tablas_derivadas.txt): 34,796,108 filas en `opt` y `std`; 4,599,289,734 bytes lógicos (4.28 GiB) en cada una; `opt` con 335 particiones diarias (20220101 a 20221201, sin `__NULL__`) y clustering `pickup_location_id` (1), `dropoff_location_id` (2); `std` sin partición ni clustering; mismo `BIT_XOR(trip_id)` que la vista de fase 1. CTAS: `opt` 4,501,953,419 bytes procesados, `std` 4,599,289,734 | Pendiente de `assess` |
 
 ## Siguiente paso
 
