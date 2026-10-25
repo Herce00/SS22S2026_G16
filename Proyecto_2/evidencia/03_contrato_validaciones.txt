@@ -1,0 +1,60 @@
+# Validaciones del contrato p2_contract.v_trips_clean (fase 1)
+# Script: Proyecto_2/sql/contract/02_validaciones_contrato.sql. Bytes según --dry_run de cada consulta.
+
+## (a) Conteo total de filas; esperado >= 1,000,000. Dry run: 2600536088 bytes
++------------+
+| total_rows |
++------------+
+|   34796108 |
++------------+
+
+## (c) Unicidad de trip_id; esperado duplicated_trip_ids = 0. Dry run: 3057779667 bytes
++------------+-------------------+---------------------+
+| total_rows | distinct_trip_ids | duplicated_trip_ids |
++------------+-------------------+---------------------+
+|   34796108 |          34796108 |                   0 |
++------------+-------------------+---------------------+
+
+## (d) Violaciones de filtros (fechas, distancia, montos); esperado 0 en todas. Dry run: 2600536088 bytes
++-----------------------+-------------------+-----------------+------------------+
+| bad_pickup_date_range | bad_trip_distance | bad_fare_amount | bad_total_amount |
++-----------------------+-------------------+-----------------+------------------+
+|                     0 |                 0 |               0 |                0 |
++-----------------------+-------------------+-----------------+------------------+
+
+## (e1) Cobertura de fechas: MIN/MAX de pickup_date. Dry run: 2600536088 bytes
++-----------------+-----------------+
+| min_pickup_date | max_pickup_date |
++-----------------+-----------------+
+|      2022-01-01 |      2022-12-01 |
++-----------------+-----------------+
+
+## (e2) Filas por pickup_month, para el split de B. Dry run: 2600536088 bytes
++--------------+---------------+
+| pickup_month | rows_in_month |
++--------------+---------------+
+|            1 |       2367647 |
+|            2 |       2866677 |
+|            3 |       3489827 |
+|            4 |       3463974 |
+|            5 |       3445399 |
+|            6 |       3412746 |
+|            7 |       3042344 |
+|            8 |       3019682 |
+|            9 |       3052193 |
+|           10 |       3516529 |
+|           11 |       3119033 |
+|           12 |            57 |
++--------------+---------------+
+
+## (extra) Origen de diciembre en la fuente: filas con pickup_datetime >= 2022-11-25 por archivo de origen. Consulta ad hoc, no forma parte del script. Dry run: 870156936 bytes
+-- SELECT data_file_year, data_file_month, COUNT(*) AS n, MIN(pickup_datetime) AS min_p, MAX(pickup_datetime) AS max_p
+-- FROM `bigquery-public-data.new_york_taxi_trips.tlc_yellow_trips_2022`
+-- WHERE pickup_datetime >= '2022-11-25'
+-- GROUP BY 1,2 ORDER BY 1,2;
++----------------+-----------------+--------+---------------------+---------------------+
+| data_file_year | data_file_month |   n    |        min_p        |        max_p        |
++----------------+-----------------+--------+---------------------+---------------------+
+|           2022 |               6 |      1 | 2023-04-18 14:30:05 | 2023-04-18 14:30:05 |
+|           2022 |              11 | 620243 | 2022-11-25 00:00:00 | 2022-12-01 23:55:39 |
++----------------+-----------------+--------+---------------------+---------------------+

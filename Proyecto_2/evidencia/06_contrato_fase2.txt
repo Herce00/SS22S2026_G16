@@ -1,0 +1,375 @@
+================================================================================
+06_contrato_fase2.txt
+Evidencia de T4 (feature p2-a-optimizacion): paso del contrato
+p2_contract.v_trips_clean de la fase 1 a la fase 2.
+Scripts: Proyecto_2/sql/contract/01_v_trips_clean.sql
+         Proyecto_2/sql/contract/02_validaciones_contrato.sql
+         Proyecto_2/sql/a_01_tablas_derivadas.sql (bloque 3, consulta (e))
+Proyecto: ss2-g16-proyecto2 (ubicación US). Fecha de ejecución: 2026-10-25.
+================================================================================
+
+--------------------------------------------------------------------------------
+Método
+--------------------------------------------------------------------------------
+- Fase 1: la vista lee bigquery-public-data.new_york_taxi_trips.tlc_yellow_trips_2022
+  y aplica los 7 filtros de limpieza.
+- Fase 2: la vista proyecta las 19 columnas de p2_a_trips.trips_2022_opt, sin
+  filtros (la limpieza vive en trips_2022_opt, decisión O1).
+- Las consultas (a) a (f) son las de 02_validaciones_contrato.sql, idénticas en
+  ambas fases. Cada una se ejecutó por separado: primero --dry_run, luego real
+  con --nouse_cache.
+- Consulta típica de B (no forma parte del script de validaciones):
+    SELECT pickup_hour, AVG(fare_amount) AS avg_fare_amount
+    FROM `ss2-g16-proyecto2.p2_contract.v_trips_clean`
+    WHERE pickup_month = 11
+    GROUP BY 1
+    ORDER BY 1;
+  Sus métricas reales salen de `region-us`.INFORMATION_SCHEMA.JOBS_BY_USER.
+- En la fase 2 el dry run informa una cota superior ("upper bound").
+
+
+================================================================================
+Fase 1 (línea base)
+================================================================================
+
+## (a) Conteo total de filas; esperado 34,796,108. Dry run: 2600536088 bytes
++------------+
+| total_rows |
++------------+
+|   34796108 |
++------------+
+
+## (b) Esquema: sin cambios respecto de 02_contrato_schema.txt (19 columnas).
+Ver la verificación de columnas de opt frente a la vista más abajo.
+
+## (c) Unicidad de trip_id; esperado duplicated_trip_ids = 0. Dry run: 3057779667 bytes
++------------+-------------------+---------------------+
+| total_rows | distinct_trip_ids | duplicated_trip_ids |
++------------+-------------------+---------------------+
+|   34796108 |          34796108 |                   0 |
++------------+-------------------+---------------------+
+
+## (d) Violaciones de los 7 filtros; esperado 0 en todas. Dry run: 2600536088 bytes
++-----------------------+------------------------------+---------------------------+-------------------+-----------------+------------------+---------------------+
+| bad_pickup_date_range | bad_dropoff_not_after_pickup | bad_duration_over_360_min | bad_trip_distance | bad_fare_amount | bad_total_amount | bad_passenger_count |
++-----------------------+------------------------------+---------------------------+-------------------+-----------------+------------------+---------------------+
+|                     0 |                            0 |                         0 |                 0 |               0 |                0 |                   0 |
++-----------------------+------------------------------+---------------------------+-------------------+-----------------+------------------+---------------------+
+
+## (e1) Cobertura exacta; esperado 2022-01-01, 2022-12-01 y 335 fechas. Dry run: 2600536088 bytes
++-----------------+-----------------+-----------------------+
+| min_pickup_date | max_pickup_date | distinct_pickup_dates |
++-----------------+-----------------+-----------------------+
+|      2022-01-01 |      2022-12-01 |                   335 |
++-----------------+-----------------+-----------------------+
+
+## (e2) Filas por pickup_month; esperado la tabla exacta del script. Dry run: 2600536088 bytes
++--------------+---------------+
+| pickup_month | rows_in_month |
++--------------+---------------+
+|            1 |       2367647 |
+|            2 |       2866677 |
+|            3 |       3489827 |
+|            4 |       3463974 |
+|            5 |       3445399 |
+|            6 |       3412746 |
+|            7 |       3042344 |
+|            8 |       3019682 |
+|            9 |       3052193 |
+|           10 |       3516529 |
+|           11 |       3119033 |
+|           12 |            57 |
++--------------+---------------+
+
+## (e3) Split de la opción A; esperado 28,160,489 / 3,516,529 / 3,119,090. Dry run: 2600536088 bytes
++--------------+----------------+
+| split_bucket | rows_in_bucket |
++--------------+----------------+
+| train        |       28160489 |
+| eval         |        3516529 |
+| new          |        3119090 |
++--------------+----------------+
+
+## (f) Huella de la fila completa. Dry run: 4501953419 bytes
++----------+---------------------+
+|    n     |       row_fp        |
++----------+---------------------+
+| 34796108 | 2642667349256316066 |
++----------+---------------------+
+
+## Consulta típica de B. Dry run: 2600536088 bytes. Job p2_t4_bq_fase1_1792951984
++-------------+--------------------+
+| pickup_hour |  avg_fare_amount   |
++-------------+--------------------+
+|           0 | 15.073224394694012 |
+|           1 | 13.662599200189916 |
+|           2 | 13.177280470852681 |
+|           3 | 14.502753930959706 |
+|           4 |  19.85478151524679 |
+|           5 |  21.57231370130535 |
+|           6 | 18.145914800655362 |
+|           7 | 15.372564071080925 |
+|           8 | 14.756129089782025 |
+|           9 |  14.63901557444996 |
+|          10 | 14.312502083581393 |
+|          11 | 14.445992406742967 |
+|          12 | 15.046828941721746 |
+|          13 |  15.64183342578211 |
+|          14 |  16.34758121785129 |
+|          15 | 16.306444319746973 |
+|          16 |  16.39052220069178 |
+|          17 | 15.487881507029506 |
+|          18 | 14.322715621413312 |
+|          19 | 14.192783880770081 |
+|          20 |  14.12495357903397 |
+|          21 | 14.404479214780661 |
+|          22 |  15.01188675519889 |
+|          23 |  15.73963670357657 |
++-------------+--------------------+
+
+
+================================================================================
+Huella de trips_2022_opt (a_01_tablas_derivadas.sql, bloque 3, consulta (e))
+================================================================================
+
+## Columnas de opt frente a la vista (INFORMATION_SCHEMA.COLUMNS), antes del cambio.
+## Mismos 19 nombres, tipos y posiciones: TO_JSON_STRING produce el mismo texto.
++----------------+------------------+---------------------+-----------+
+|     source     | ordinal_position |     column_name     | data_type |
++----------------+------------------+---------------------+-----------+
+| trips_2022_opt |                1 | trip_id             | INT64     |
+| v_trips_clean  |                1 | trip_id             | INT64     |
+| trips_2022_opt |                2 | vendor_id           | STRING    |
+| v_trips_clean  |                2 | vendor_id           | STRING    |
+| trips_2022_opt |                3 | pickup_datetime     | TIMESTAMP |
+| v_trips_clean  |                3 | pickup_datetime     | TIMESTAMP |
+| trips_2022_opt |                4 | dropoff_datetime    | TIMESTAMP |
+| v_trips_clean  |                4 | dropoff_datetime    | TIMESTAMP |
+| trips_2022_opt |                5 | pickup_date         | DATE      |
+| v_trips_clean  |                5 | pickup_date         | DATE      |
+| trips_2022_opt |                6 | pickup_hour         | INT64     |
+| v_trips_clean  |                6 | pickup_hour         | INT64     |
+| trips_2022_opt |                7 | pickup_dow          | INT64     |
+| v_trips_clean  |                7 | pickup_dow          | INT64     |
+| trips_2022_opt |                8 | pickup_month        | INT64     |
+| v_trips_clean  |                8 | pickup_month        | INT64     |
+| trips_2022_opt |                9 | trip_duration_min   | FLOAT64   |
+| v_trips_clean  |                9 | trip_duration_min   | FLOAT64   |
+| trips_2022_opt |               10 | passenger_count     | INT64     |
+| v_trips_clean  |               10 | passenger_count     | INT64     |
+| trips_2022_opt |               11 | trip_distance       | FLOAT64   |
+| v_trips_clean  |               11 | trip_distance       | FLOAT64   |
+| trips_2022_opt |               12 | rate_code           | STRING    |
+| v_trips_clean  |               12 | rate_code           | STRING    |
+| trips_2022_opt |               13 | payment_type        | STRING    |
+| v_trips_clean  |               13 | payment_type        | STRING    |
+| trips_2022_opt |               14 | fare_amount         | FLOAT64   |
+| v_trips_clean  |               14 | fare_amount         | FLOAT64   |
+| trips_2022_opt |               15 | tip_amount          | FLOAT64   |
+| v_trips_clean  |               15 | tip_amount          | FLOAT64   |
+| trips_2022_opt |               16 | tolls_amount        | FLOAT64   |
+| v_trips_clean  |               16 | tolls_amount        | FLOAT64   |
+| trips_2022_opt |               17 | total_amount        | FLOAT64   |
+| v_trips_clean  |               17 | total_amount        | FLOAT64   |
+| trips_2022_opt |               18 | pickup_location_id  | STRING    |
+| v_trips_clean  |               18 | pickup_location_id  | STRING    |
+| trips_2022_opt |               19 | dropoff_location_id | STRING    |
+| v_trips_clean  |               19 | dropoff_location_id | STRING    |
++----------------+------------------+---------------------+-----------+
+
+## Huella de opt. Dry run: upper bound de 4599289734 bytes
++----------+---------------------+
+|    n     |       row_fp        |
++----------+---------------------+
+| 34796108 | 2642667349256316066 |
++----------+---------------------+
+Resultado: igual a (f) de la vista en fase 1. opt tiene el mismo contenido,
+fila por fila y columna por columna, que la vista de fase 1.
+
+
+================================================================================
+Cambio de fase
+================================================================================
+
+## CREATE OR REPLACE VIEW de 01_v_trips_clean.sql. Dry run: upper bound de 0 bytes
+Replaced ss2-g16-proyecto2.p2_contract.v_trips_clean
+
+
+================================================================================
+Fase 2
+================================================================================
+
+## (a) Conteo total de filas; esperado 34,796,108. Dry run: upper bound de 0 bytes
++------------+
+| total_rows |
++------------+
+|   34796108 |
++------------+
+
+## (b) Esquema publicado; esperado las 19 columnas del contrato. Consulta de metadatos.
++------------------+---------------------+-----------+
+| ordinal_position |     column_name     | data_type |
++------------------+---------------------+-----------+
+|                1 | trip_id             | INT64     |
+|                2 | vendor_id           | STRING    |
+|                3 | pickup_datetime     | TIMESTAMP |
+|                4 | dropoff_datetime    | TIMESTAMP |
+|                5 | pickup_date         | DATE      |
+|                6 | pickup_hour         | INT64     |
+|                7 | pickup_dow          | INT64     |
+|                8 | pickup_month        | INT64     |
+|                9 | trip_duration_min   | FLOAT64   |
+|               10 | passenger_count     | INT64     |
+|               11 | trip_distance       | FLOAT64   |
+|               12 | rate_code           | STRING    |
+|               13 | payment_type        | STRING    |
+|               14 | fare_amount         | FLOAT64   |
+|               15 | tip_amount          | FLOAT64   |
+|               16 | tolls_amount        | FLOAT64   |
+|               17 | total_amount        | FLOAT64   |
+|               18 | pickup_location_id  | STRING    |
+|               19 | dropoff_location_id | STRING    |
++------------------+---------------------+-----------+
+
+## (c) Unicidad de trip_id; esperado duplicated_trip_ids = 0. Dry run: upper bound de 278368864 bytes
++------------+-------------------+---------------------+
+| total_rows | distinct_trip_ids | duplicated_trip_ids |
++------------+-------------------+---------------------+
+|   34796108 |          34796108 |                   0 |
++------------+-------------------+---------------------+
+
+## (d) Violaciones de los 7 filtros; esperado 0 en todas. Dry run: upper bound de 1660860568 bytes
++-----------------------+------------------------------+---------------------------+-------------------+-----------------+------------------+---------------------+
+| bad_pickup_date_range | bad_dropoff_not_after_pickup | bad_duration_over_360_min | bad_trip_distance | bad_fare_amount | bad_total_amount | bad_passenger_count |
++-----------------------+------------------------------+---------------------------+-------------------+-----------------+------------------+---------------------+
+|                     0 |                            0 |                         0 |                 0 |               0 |                0 |                   0 |
++-----------------------+------------------------------+---------------------------+-------------------+-----------------+------------------+---------------------+
+
+## (e1) Cobertura exacta; esperado 2022-01-01, 2022-12-01 y 335 fechas. Dry run: upper bound de 278368864 bytes
++-----------------+-----------------+-----------------------+
+| min_pickup_date | max_pickup_date | distinct_pickup_dates |
++-----------------+-----------------+-----------------------+
+|      2022-01-01 |      2022-12-01 |                   335 |
++-----------------+-----------------+-----------------------+
+
+## (e2) Filas por pickup_month; esperado la tabla exacta del script. Dry run: upper bound de 278368864 bytes
++--------------+---------------+
+| pickup_month | rows_in_month |
++--------------+---------------+
+|            1 |       2367647 |
+|            2 |       2866677 |
+|            3 |       3489827 |
+|            4 |       3463974 |
+|            5 |       3445399 |
+|            6 |       3412746 |
+|            7 |       3042344 |
+|            8 |       3019682 |
+|            9 |       3052193 |
+|           10 |       3516529 |
+|           11 |       3119033 |
+|           12 |            57 |
++--------------+---------------+
+
+## (e3) Split de la opción A; esperado 28,160,489 / 3,516,529 / 3,119,090. Dry run: upper bound de 278368864 bytes
++--------------+----------------+
+| split_bucket | rows_in_bucket |
++--------------+----------------+
+| train        |       28160489 |
+| eval         |        3516529 |
+| new          |        3119090 |
++--------------+----------------+
+
+## (f) Huella de la fila completa; esperado igual a la fase 1. Dry run: upper bound de 4599289734 bytes
++----------+---------------------+
+|    n     |       row_fp        |
++----------+---------------------+
+| 34796108 | 2642667349256316066 |
++----------+---------------------+
+
+## Consulta típica de B. Dry run: upper bound de 74856792 bytes. Job p2_t4_bq_fase2_1792952169
++-------------+--------------------+
+| pickup_hour |  avg_fare_amount   |
++-------------+--------------------+
+|           0 | 15.073224394694016 |
+|           1 | 13.662599200189916 |
+|           2 |  13.17728047085269 |
+|           3 | 14.502753930959697 |
+|           4 | 19.854781515246785 |
+|           5 |  21.57231370130538 |
+|           6 | 18.145914800655387 |
+|           7 |  15.37256407108095 |
+|           8 | 14.756129089782014 |
+|           9 | 14.639015574449983 |
+|          10 | 14.312502083581377 |
+|          11 | 14.445992406743015 |
+|          12 | 15.046828941721742 |
+|          13 | 15.641833425782117 |
+|          14 | 16.347581217851268 |
+|          15 | 16.306444319746973 |
+|          16 | 16.390522200691763 |
+|          17 |  15.48788150702949 |
+|          18 | 14.322715621413304 |
+|          19 | 14.192783880770081 |
+|          20 |  14.12495357903395 |
+|          21 | 14.404479214780602 |
+|          22 |  15.01188675519888 |
+|          23 | 15.739636703576549 |
++-------------+--------------------+
+
+## Repetición de la consulta típica de B en fase 2. Job p2_t4_bq_fase2_rerun_1792952169
++-------------+--------------------+
+| pickup_hour |  avg_fare_amount   |
++-------------+--------------------+
+|           0 |  15.07322439469402 |
+|           1 | 13.662599200189918 |
+|           2 | 13.177280470852688 |
+|           3 | 14.502753930959697 |
+|           4 | 19.854781515246778 |
+|           5 | 21.572313701305376 |
+|           6 | 18.145914800655383 |
+|           7 |  15.37256407108095 |
+|           8 | 14.756129089782018 |
+|           9 | 14.639015574449981 |
+|          10 | 14.312502083581379 |
+|          11 | 14.445992406743013 |
+|          12 | 15.046828941721742 |
+|          13 | 15.641833425782114 |
+|          14 | 16.347581217851264 |
+|          15 |  16.30644431974698 |
+|          16 |  16.39052220069176 |
+|          17 |  15.48788150702949 |
+|          18 | 14.322715621413304 |
+|          19 | 14.192783880770083 |
+|          20 | 14.124953579033948 |
+|          21 | 14.404479214780599 |
+|          22 | 15.011886755198882 |
+|          23 | 15.739636703576549 |
++-------------+--------------------+
+
+## Métricas reales de la consulta típica de B (JOBS_BY_USER). Dry run: 1851155 bytes
++---------------------------------+-----------+-----------------------+--------------------+---------------+-------------+
+|             job_id              | cache_hit | total_bytes_processed | total_bytes_billed | total_slot_ms | duration_ms |
++---------------------------------+-----------+-----------------------+--------------------+---------------+-------------+
+| p2_t4_bq_fase1_1792951984       |     false |            2600536088 |         2601517056 |         16154 |         541 |
+| p2_t4_bq_fase2_1792952169       |     false |              74856792 |           75497472 |           584 |         347 |
+| p2_t4_bq_fase2_rerun_1792952169 |     false |              74856792 |           75497472 |           440 |         353 |
++---------------------------------+-----------+-----------------------+--------------------+---------------+-------------+
+
+
+================================================================================
+Resultado
+================================================================================
+- (a), (b), (c), (d), (e1), (e2), (e3) y (f) son idénticos en ambas fases.
+  row_fp = 2642667349256316066 en la vista de fase 1, en trips_2022_opt y en la
+  vista de fase 2: el contenido no cambió.
+- Consulta típica de B: 2,600,536,088 bytes procesados en fase 1 frente a
+  74,856,792 en fase 2 (-97.12 %, unas 34.7 veces menos); slot ms 16,154 frente
+  a 584. En fase 2 los bytes reales coinciden con la cota superior del dry run.
+  74,856,792 = 3,119,033 filas de noviembre x 24 bytes (3 columnas de 8 bytes):
+  solo se leyeron los datos de noviembre de pickup_hour, fare_amount y
+  pickup_month.
+- Los promedios de la consulta típica de B difieren solo desde el decimal 13
+  (diferencia absoluta máxima 5.9e-14 entre fases). Dos ejecuciones de la fase 2
+  también difieren entre sí (máxima 7.1e-15): es el orden no determinista de la
+  suma de FLOAT64 en AVG, no un cambio de datos. Redondeados a 10 decimales, los
+  24 valores son iguales en las tres ejecuciones.

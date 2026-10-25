@@ -1,0 +1,402 @@
+================================================================================
+08_eda_categorica.txt
+Evidencia de T3 (feature p2-a-eda): análisis exploratorio categórico y de zonas.
+Script: Proyecto_2/sql/a_04_eda_categorica.sql
+Fuentes: ss2-g16-proyecto2.p2_a_trips.trips_2022_opt (decisión E1) y
+         bigquery-public-data.new_york_taxi_trips.taxi_zone_geom (decisión E2).
+Proyecto: ss2-g16-proyecto2 (ubicación US). Fecha de ejecución: 2026-10-25.
+================================================================================
+
+--------------------------------------------------------------------------------
+Método
+--------------------------------------------------------------------------------
+- Cada consulta se extrajo de su bloque [Cn] del script a un archivo propio,
+  así que el texto ejecutado coincide byte a byte con el bloque.
+- Cada consulta se ejecutó primero con --dry_run y luego real, con
+  --format=pretty. Se quitaron las líneas "Waiting on bqjob".
+- El dry run sobre opt es una cota superior ("upper bound"). Ninguna consulta
+  supera el límite de 10 GB; la mayor (C2d) estima 1,496,232,644 bytes.
+- taxi_zone_geom tiene 263 filas y 260 zone_id distintos (56 aparece 2 veces
+  y 103, 3 veces, con el mismo nombre y borough). Las consultas usan
+  SELECT DISTINCT zone_id, zone_name, borough para no duplicar viajes.
+- Los percentiles salen de APPROX_QUANTILES(x, 100) y son aproximados.
+
+--------------------------------------------------------------------------------
+C1: distribución por tipo de pago.
+Pregunta: ¿cómo pagan los pasajeros y cuánto gastan y dejan de propina según el
+medio de pago?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 661126052 bytes.
+
++--------------+--------------------+----------+-----------+-----------+---------+
+| payment_type |   payment_label    |  trips   | pct_trips | avg_total | avg_tip |
++--------------+--------------------+----------+-----------+-----------+---------+
+| 0            | Sin código (0)     |  1169077 |      3.36 |     28.14 |    3.86 |
+| 1            | Tarjeta de crédito | 26703778 |     76.74 |     22.01 |     3.4 |
+| 2            | Efectivo           |  6772717 |     19.46 |     18.22 |     0.0 |
+| 3            | Sin cargo          |    85848 |      0.25 |     22.41 |     0.0 |
+| 4            | Disputa            |    64687 |      0.19 |     24.86 |    0.01 |
+| 5            | Desconocido        |        1 |       0.0 |      11.8 |     0.0 |
++--------------+--------------------+----------+-----------+-----------+---------+
+
+Control: 1,169,077 + 26,703,778 + 6,772,717 + 85,848 + 64,687 + 1 = 34,796,108
+(cumple). No aparece ningún viaje con código 6 (Anulado).
+
+--------------------------------------------------------------------------------
+C2a: código 0, coincidencia con passenger_count y rate_code nulos.
+Pregunta: ¿los viajes con payment_type '0' son los mismos que no tienen
+passenger_count ni rate_code?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 541639153 bytes.
+
++---------+----------------------+--------------------------+----------------------+---------------------------+----------------+--------------------------+
+|  code0  | null_passenger_count | code0_and_null_passenger | code0_with_passenger | null_passenger_other_code | null_rate_code | code0_and_null_rate_code |
++---------+----------------------+--------------------------+----------------------+---------------------------+----------------+--------------------------+
+| 1169077 |              1169077 |                  1169077 |                    0 |                         0 |        1169077 |                  1169077 |
++---------+----------------------+--------------------------+----------------------+---------------------------+----------------+--------------------------+
+
+Los tres conjuntos son idénticos: 1,169,077 viajes con payment_type '0',
+passenger_count nulo y rate_code nulo a la vez. No hay nulos de
+passenger_count fuera del código 0 ni viajes con código 0 que lo tengan.
+
+--------------------------------------------------------------------------------
+C2b: código 0, distribución de rate_code y vendor_id.
+Pregunta: ¿qué tarifa y qué proveedor tienen los viajes con código 0?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 377010602 bytes.
+
++-----------+-------+---------+----------------------+
+| dimension | value |  trips  | pct_within_dimension |
++-----------+-------+---------+----------------------+
+| rate_code | NULL  | 1169077 |                100.0 |
+| vendor_id | 2     |  920866 |                78.77 |
+| vendor_id | 1     |  202196 |                 17.3 |
+| vendor_id | 6     |   45872 |                 3.92 |
+| vendor_id | 5     |     143 |                 0.01 |
++-----------+-------+---------+----------------------+
+
+Todo el código 0 tiene rate_code nulo. Los vendor_id 5 y 6 tienen todos sus
+viajes en el código 0 (143 de 143 y 45,872 de 45,872; totales en C5).
+
+--------------------------------------------------------------------------------
+C2c: código 0, participación por mes.
+Pregunta: ¿el código 0 aparece de forma pareja en el año o se concentra en algunos
+meses?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 382757188 bytes.
+
++--------------+---------+-------------+-----------+
+| pickup_month |  trips  | code0_trips | pct_code0 |
++--------------+---------+-------------+-----------+
+|            1 | 2367647 |       68499 |      2.89 |
+|            2 | 2866677 |       98152 |      3.42 |
+|            3 | 3489827 |      113248 |      3.25 |
+|            4 | 3463974 |      115145 |      3.32 |
+|            5 | 3445399 |      126005 |      3.66 |
+|            6 | 3412746 |      127203 |      3.73 |
+|            7 | 3042344 |       99429 |      3.27 |
+|            8 | 3019682 |       85641 |      2.84 |
+|            9 | 3052193 |      110516 |      3.62 |
+|           10 | 3516529 |      121077 |      3.44 |
+|           11 | 3119033 |      104162 |      3.34 |
+|           12 |      57 |           0 |       0.0 |
++--------------+---------+-------------+-----------+
+
+Control: la suma de trips es 34,796,108 y la de code0_trips es 1,169,077
+(cumple). Diciembre solo tiene 57 viajes, todos del 2022-12-01 (ver D1 en
+07_eda_descriptiva.txt).
+
+--------------------------------------------------------------------------------
+C2d: código 0 frente a tarjeta (1) y efectivo (2).
+Pregunta: ¿los viajes con código 0 se parecen en tarifa, propina, distancia y
+duración a los pagados con tarjeta o a los pagados en efectivo?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 1496232644 bytes.
+
++--------------+----------+----------+---------+------------+-----------------+------------------+-----------+
+| payment_type |  trips   | avg_fare | avg_tip | pct_tipped | avg_distance_mi | avg_duration_min | avg_total |
++--------------+----------+----------+---------+------------+-----------------+------------------+-----------+
+| 0            |  1169077 |     20.5 |    3.86 |      89.79 |            4.62 |            20.33 |     28.14 |
+| 1            | 26703778 |    14.45 |     3.4 |      96.38 |            3.54 |            15.66 |     22.01 |
+| 2            |  6772717 |     14.3 |     0.0 |       0.01 |            3.47 |            15.53 |     18.22 |
++--------------+----------+----------+---------+------------+-----------------+------------------+-----------+
+
+--------------------------------------------------------------------------------
+C3a: distribución por tipo de tarifa (rate_code).
+Pregunta: ¿qué tarifas se usan y cuánto cuesta cada una?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 446603445 bytes.
+
++-----------+--------------------+----------+-----------+----------+----------+
+| rate_code |     rate_label     |  trips   | pct_trips | avg_fare | p50_fare |
++-----------+--------------------+----------+-----------+----------+----------+
+| NULL      | Sin código (NULL)  |  1169077 |      3.36 |     20.5 |     16.0 |
+| 1.0       | Estándar           | 31970777 |     91.88 |    12.39 |      9.5 |
+| 2.0       | JFK                |  1288971 |       3.7 |     52.0 |     52.0 |
+| 3.0       | Newark             |    88420 |      0.25 |    68.59 |     68.0 |
+| 4.0       | Nassau/Westchester |    45672 |      0.13 |    74.01 |     64.5 |
+| 5.0       | Negociada          |   133660 |      0.38 |    72.85 |     65.0 |
+| 6.0       | Grupal             |      105 |       0.0 |     4.15 |      3.5 |
+| 99.0      | Desconocido        |    99426 |      0.29 |    32.88 |     29.2 |
++-----------+--------------------+----------+-----------+----------+----------+
+
+rate_code se guarda como texto con decimal ('1.0', '2.0', ...). La fila
+NULL corresponde al código 0 de pago (C2a).
+
+--------------------------------------------------------------------------------
+C3b: tarifas más frecuentes dentro de la tarifa JFK (rate_code '2.0').
+Pregunta: ¿la tarifa JFK es un monto fijo? Prueba la hipótesis de T2 sobre la cola
+de fare_amount cerca de USD 52.
+--------------------------------------------------------------------------------
+Dry run: upper bound of 446603312 bytes.
+
++-------------+---------+------------------+
+| fare_amount |  trips  | pct_of_jfk_trips |
++-------------+---------+------------------+
+|        52.0 | 1288845 |            99.99 |
+|       54.05 |      15 |              0.0 |
+|        55.3 |      14 |              0.0 |
+|         2.5 |      10 |              0.0 |
+|        63.1 |      10 |              0.0 |
++-------------+---------+------------------+
+
+1,288,845 de 1,288,971 viajes JFK (99.99 %) tienen fare_amount = 52.0.
+
+--------------------------------------------------------------------------------
+C3c: tipo de tarifa de los viajes con fare_amount = 52.
+Pregunta: ¿qué parte de los viajes de USD 52 exactos es tarifa JFK?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 446603312 bytes.
+
++-----------+---------+----------------+
+| rate_code |  trips  | pct_of_fare_52 |
++-----------+---------+----------------+
+| 2.0       | 1288845 |          98.76 |
+| 1.0       |    9714 |           0.74 |
+| NULL      |    4994 |           0.38 |
+| 5.0       |     974 |           0.07 |
+| 4.0       |     260 |           0.02 |
+| 3.0       |     161 |           0.01 |
+| 99.0      |      15 |            0.0 |
++-----------+---------+----------------+
+
+--------------------------------------------------------------------------------
+C4: distribución por número de pasajeros, con nulos.
+Pregunta: ¿cuántos pasajeros lleva cada viaje y cambia el gasto con ese número?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 547385112 bytes.
+
++-----------------+----------+-----------+-----------+
+| passenger_count |  trips   | pct_trips | avg_total |
++-----------------+----------+-----------+-----------+
+|            NULL |  1169077 |      3.36 |     28.14 |
+|               1 | 25357974 |     72.88 |     20.73 |
+|               2 |  5240142 |     15.06 |     23.14 |
+|               3 |  1369826 |      3.94 |     22.91 |
+|               4 |   608187 |      1.75 |     23.86 |
+|               5 |   628336 |      1.81 |     20.71 |
+|               6 |   422566 |      1.21 |     20.94 |
++-----------------+----------+-----------+-----------+
+
+Control: 1,169,077 + 25,357,974 + 5,240,142 + 1,369,826 + 608,187 + 628,336
++ 422,566 = 34,796,108 (cumple). No hay viajes con 0 ni con más de 6
+pasajeros.
+
+--------------------------------------------------------------------------------
+C5: distribución por proveedor (vendor_id).
+Pregunta: ¿qué proveedores registran los viajes y con qué gasto promedio?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 382757188 bytes.
+
++-----------+----------+-----------+-----------+
+| vendor_id |  trips   | pct_trips | avg_total |
++-----------+----------+-----------+-----------+
+| 1         |  9422595 |     27.08 |      20.6 |
+| 2         | 25327498 |     72.79 |     21.76 |
+| 5         |      143 |       0.0 |     69.76 |
+| 6         |    45872 |      0.13 |     49.04 |
++-----------+----------+-----------+-----------+
+
+Control: la suma de trips es 34,796,108 (cumple).
+
+--------------------------------------------------------------------------------
+C6a: top 10 de zonas de origen.
+Pregunta: ¿dónde empiezan la mayoría de los viajes?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 446459700 bytes.
+
++-----------+-------------+------------------------------+-----------+---------+-----------+-----------+
+| trip_rank | location_id |          zone_name           |  borough  |  trips  | pct_trips | avg_total |
++-----------+-------------+------------------------------+-----------+---------+-----------+-----------+
+|         1 | 132         | JFK Airport                  | Queens    | 1651005 |      4.74 |     61.39 |
+|         2 | 237         | Upper East Side South        | Manhattan | 1641064 |      4.72 |     15.66 |
+|         3 | 236         | Upper East Side North        | Manhattan | 1458357 |      4.19 |     16.51 |
+|         4 | 161         | Midtown Center               | Manhattan | 1400467 |      4.02 |     18.47 |
+|         5 | 186         | Penn Station/Madison Sq West | Manhattan | 1142035 |      3.28 |     18.52 |
+|         6 | 162         | Midtown East                 | Manhattan | 1140842 |      3.28 |     18.03 |
+|         7 | 142         | Lincoln Square East          | Manhattan | 1135722 |      3.26 |     17.09 |
+|         8 | 170         | Murray Hill                  | Manhattan | 1078034 |       3.1 |     18.15 |
+|         9 | 230         | Times Sq/Theatre District    | Manhattan | 1076478 |      3.09 |     20.93 |
+|        10 | 48          | Clinton East                 | Manhattan | 1066421 |      3.06 |     18.73 |
++-----------+-------------+------------------------------+-----------+---------+-----------+-----------+
+
+--------------------------------------------------------------------------------
+C6b: top 10 de zonas de destino.
+Pregunta: ¿dónde terminan la mayoría de los viajes?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 444761933 bytes.
+
++-----------+-------------+---------------------------+-----------+---------+-----------+-----------+
+| trip_rank | location_id |         zone_name         |  borough  |  trips  | pct_trips | avg_total |
++-----------+-------------+---------------------------+-----------+---------+-----------+-----------+
+|         1 | 236         | Upper East Side North     | Manhattan | 1500024 |      4.31 |     16.15 |
+|         2 | 237         | Upper East Side South     | Manhattan | 1425424 |       4.1 |      15.4 |
+|         3 | 161         | Midtown Center            | Manhattan | 1275107 |      3.66 |     17.87 |
+|         4 | 170         | Murray Hill               | Manhattan | 1034919 |      2.97 |     17.96 |
+|         5 | 230         | Times Sq/Theatre District | Manhattan | 1025955 |      2.95 |     22.57 |
+|         6 | 239         | Upper West Side South     | Manhattan |  968943 |      2.78 |     17.94 |
+|         7 | 142         | Lincoln Square East       | Manhattan |  955664 |      2.75 |     17.14 |
+|         8 | 141         | Lenox Hill West           | Manhattan |  947177 |      2.72 |     16.68 |
+|         9 | 48          | Clinton East              | Manhattan |  939059 |       2.7 |     20.31 |
+|        10 | 162         | Midtown East              | Manhattan |  923197 |      2.65 |     18.11 |
++-----------+-------------+---------------------------+-----------+---------+-----------+-----------+
+
+--------------------------------------------------------------------------------
+C6c: ids de ubicación sin zona en taxi_zone_geom.
+Pregunta: ¿cuántos viajes tienen un origen o destino que no corresponde a ninguna
+zona?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 334468232 bytes.
+
++---------+-------------+--------+------------------+
+|  side   | location_id | trips  | pct_of_all_trips |
++---------+-------------+--------+------------------+
+| pickup  | 264         | 394127 |             1.13 |
+| pickup  | 265         |  52805 |             0.15 |
+| pickup  | 57          |     83 |              0.0 |
+| pickup  | 105         |     11 |              0.0 |
+| dropoff | 264         | 196562 |             0.56 |
+| dropoff | 265         | 111896 |             0.32 |
+| dropoff | 57          |   1035 |              0.0 |
+| dropoff | 105         |     20 |              0.0 |
++---------+-------------+--------+------------------+
+
+Origen sin zona: 394,127 + 52,805 + 83 + 11 = 447,026 viajes (1.28 %).
+Destino sin zona: 196,562 + 111,896 + 1,035 + 20 = 309,513 viajes (0.89 %).
+264 y 265 son Unknown y Outside of NYC en TLC. 57 y 105 son ids que usan
+los viajes pero que no tienen fila propia en taxi_zone_geom; la tabla
+repite polígonos con los ids 56 y 103 (ver nota del script).
+
+--------------------------------------------------------------------------------
+C7: viajes por borough de origen.
+Pregunta: ¿cómo se reparten los viajes entre los boroughs de Nueva York?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 724828564 bytes.
+
++----------------+----------+-----------+-----------+-----------------+
+| pickup_borough |  trips   | pct_trips | avg_total | avg_distance_mi |
++----------------+----------+-----------+-----------+-----------------+
+| Manhattan      | 31144223 |      89.5 |     18.19 |             2.6 |
+| Queens         |  2928137 |      8.42 |      54.0 |           13.15 |
+| Sin zona       |   447026 |      1.28 |     33.39 |             6.4 |
+| Brooklyn       |   237641 |      0.68 |     27.83 |            5.41 |
+| Bronx          |    35078 |       0.1 |     31.04 |            6.65 |
+| EWR            |     2085 |      0.01 |     106.9 |            3.17 |
+| Staten Island  |     1918 |      0.01 |     67.61 |           15.46 |
++----------------+----------+-----------+-----------+-----------------+
+
+Control: la suma de trips es 34,796,108 (cumple); la unión con zonas no
+duplica viajes. "Sin zona" (447,026) coincide con el total de origen sin
+zona de C6c.
+
+--------------------------------------------------------------------------------
+C8a: viajes con propina por tipo de pago (prueba de la decisión E4).
+Pregunta: ¿se registran propinas en los pagos en efectivo?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 382757188 bytes.
+
++--------------+----------+--------------+------------+---------+
+| payment_type |  trips   | tipped_trips | pct_tipped | avg_tip |
++--------------+----------+--------------+------------+---------+
+| 0            |  1169077 |      1049737 |      89.79 |    3.86 |
+| 1            | 26703778 |     25738020 |      96.38 |     3.4 |
+| 2            |  6772717 |          615 |       0.01 |     0.0 |
+| 3            |    85848 |           46 |       0.05 |     0.0 |
+| 4            |    64687 |           62 |        0.1 |    0.01 |
+| 5            |        1 |            0 |        0.0 |     0.0 |
++--------------+----------+--------------+------------+---------+
+
+Efectivo: 615 de 6,772,717 viajes (0.01 %) tienen tip_amount > 0.
+
+--------------------------------------------------------------------------------
+C8b: tasa de propina con tarjeta (payment_type '1').
+Pregunta: ¿qué porcentaje de la tarifa dejan de propina quienes pagan con tarjeta y
+cuántos no dejan nada?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 661126052 bytes.
+
++------------+------------------+---------+---------+---------+---------+---------+--------------+------------+--------------------+
+| card_trips | avg_tip_rate_pct | p25_pct | p50_pct | p75_pct | p95_pct | p99_pct | no_tip_trips | pct_no_tip | negative_tip_trips |
++------------+------------------+---------+---------+---------+---------+---------+--------------+------------+--------------------+
+|   26703778 |            26.66 |   21.55 |    26.4 |    31.0 |   41.65 |    55.8 |       965758 |       3.62 |                  0 |
++------------+------------------+---------+---------+---------+---------+---------+--------------+------------+--------------------+
+
+Ningún viaje con tarjeta tiene fare_amount <= 0, así que el filtro no
+excluye filas (card_trips = 26,703,778, igual a C1).
+
+--------------------------------------------------------------------------------
+Controles de consistencia
+--------------------------------------------------------------------------------
+- C1: la suma por tipo de pago = 34,796,108 (cumple).
+- C4: la suma por número de pasajeros, con NULL = 34,796,108 (cumple).
+- C7: la suma por borough de origen, con "Sin zona" = 34,796,108 (cumple).
+- Adicionales: C2c suma 34,796,108 viajes y 1,169,077 de código 0; C5 suma
+  34,796,108; "Sin zona" de C7 = origen sin zona de C6c = 447,026.
+
+--------------------------------------------------------------------------------
+Decisión E4
+--------------------------------------------------------------------------------
+E4 queda verificada. Con efectivo (payment_type '2') solo 615 de 6,772,717
+viajes (0.01 %) registran propina, frente al 96.38 % con tarjeta (C8a). Las
+propinas en efectivo no quedan registradas, así que el análisis de propinas
+se limita a pagos con tarjeta.
+
+--------------------------------------------------------------------------------
+Hallazgos
+--------------------------------------------------------------------------------
+- [C1] El 76.74 % de los viajes se paga con tarjeta y el 19.46 % en efectivo.
+  El código 0, fuera del diccionario de TLC, reúne 1,169,077 viajes (3.36 %)
+  y tiene el total promedio más alto de todos los códigos (USD 28.14 frente
+  a 22.01 con tarjeta y 18.22 en efectivo).
+- [C2a, C2b] El código 0 es un bloque cerrado: los mismos 1,169,077 viajes
+  tienen payment_type '0', passenger_count nulo y rate_code nulo, y no hay
+  nulos de esos campos fuera de él. El 78.77 % viene del vendor_id 2, y todos
+  los viajes de los vendor_id 5 y 6 caen en él. Podrían ser registros que no
+  pasan por el taxímetro, por ejemplo viajes despachados por otra vía
+  (hipótesis).
+- [C2c, C2d] De enero a noviembre, el código 0 representa entre 2.84 % y
+  3.73 % de los viajes de cada mes, sin concentrarse en ninguno; diciembre
+  (57 viajes) no tiene ninguno. Sus viajes son más largos (4.62 mi y 20.33 min de media, frente a 3.54 mi y 15.66 min con tarjeta) y
+  el 89.79 % registra propina, un patrón más cercano a la tarjeta (96.38 %)
+  que al efectivo (0.01 %). Que se cobren por un medio electrónico es una
+  hipótesis.
+- [C3a, C3b, C3c] Se confirma la hipótesis de T2: el 99.99 % de los viajes con
+  tarifa JFK (rate_code '2.0', 3.70 % del total) tiene fare_amount = 52.0, y
+  el 98.76 % de los viajes de USD 52 exactos es tarifa JFK. La tarifa
+  estándar cubre el 91.88 % de los viajes, con una mediana de USD 9.50.
+- [C4, C5] El 72.88 % de los viajes lleva 1 pasajero y el 15.06 %, 2; no hay
+  viajes con 0 ni con más de 6. El vendor_id 2 registra el 72.79 % de los
+  viajes y el 1, el 27.08 %; los vendor_id 5 y 6 suman 46,015 viajes, con
+  totales promedio de USD 69.76 y 49.04.
+- [C6a, C6b, C7] El 89.50 % de los viajes empieza en Manhattan y 9 de las 10
+  zonas de origen principales están ahí. La excepción es JFK Airport, la zona
+  de origen número 1 (1,651,005 viajes, 4.74 %), con un total promedio de
+  USD 61.39 frente a USD 15.66 a 20.93 en esas zonas de Manhattan. Las 10
+  zonas de destino principales son todas de Manhattan.
+- [C6c] 447,026 viajes (1.28 %) empiezan y 309,513 (0.89 %) terminan en un id
+  sin zona. Casi todos son 264 (Unknown) y 265 (Outside of NYC); 57 y 105
+  aparecen porque taxi_zone_geom no tiene filas propias para esos ids.
+- [C8a, C8b] E4 queda verificada (ver la sección anterior). Con tarjeta, la
+  tasa de propina sobre la tarifa tiene una mediana de 26.40 % (p25 21.55 %,
+  p75 31.00 %, p99 55.80 %) y una media de 26.66 %. El 3.62 % de los viajes
+  con tarjeta (965,758) no deja propina y ninguno tiene propina negativa.
