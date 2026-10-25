@@ -41,7 +41,7 @@ Redactar en `Proyecto_2/README.md` todas las secciones técnicas correspondiente
 
 | ID | Commit | Evidencia | Revisión |
 |----|--------|-----------|----------|
-| T1 | Este commit | `odd/tasks/p2-a-readme.md` | Pendiente |
+| T1 | `2954ed9` | `odd/tasks/p2-a-readme.md` | Omitido (plan) |
 
 ## Siguiente paso
 
