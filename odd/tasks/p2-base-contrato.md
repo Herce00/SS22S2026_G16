@@ -33,7 +33,7 @@ Primera parte independiente de Persona A: preparar la base en GCP y publicar la 
 |----------|-------|
 | Estrategia | `ask-on-risk` |
 | Pronóstico | Unas 400 a 500 líneas de autoría, sobre todo documentación y SQL |
-| Rama | `feat/p2-base-contrato` |
+| Rama | `feat/p2-a-datos` (renombrada desde `feat/p2-base-contrato`) |
 
 ## Tareas
 
