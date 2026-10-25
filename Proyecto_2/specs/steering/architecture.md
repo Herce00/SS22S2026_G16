@@ -66,6 +66,8 @@ Es el mecanismo de desacoplamiento entre A y B.
 | Fase 1 (día 1) | El `FROM` apunta a la tabla pública y aplica los filtros de limpieza. B empieza de inmediato, sin esperar a A. |
 | Fase 2 | Cuando A termina `trips_2022_opt`, A cambia el `FROM` a `p2_a_trips.trips_2022_opt` **sin cambiar el esquema**. B no modifica nada. |
 
+**2026-10-25:** la fase 2 está activa. La vista ahora proyecta `p2_a_trips.trips_2022_opt` y el esquema no cambió. Evidencia: `Proyecto_2/evidencia/06_contrato_fase2.txt`.
+
 ### Columnas
 
 | Columna | Tipo | Regla |

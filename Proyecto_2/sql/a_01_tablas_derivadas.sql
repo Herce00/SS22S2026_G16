@@ -139,10 +139,20 @@ SELECT * FROM `ss2-g16-proyecto2.p2_a_trips.trips_2022_opt`;
 --   AND (clustering_ordinal_position IS NOT NULL OR is_partitioning_column = 'YES')
 -- ORDER BY table_name, clustering_ordinal_position;
 
--- (e) ¿trips_2022_opt tiene el mismo contenido que la vista del contrato en fase 1?
---     Se comparan el conteo y el BIT_XOR de trip_id. Esperado: valores iguales.
--- SELECT 'trips_2022_opt' AS source, COUNT(*) AS row_count, BIT_XOR(trip_id) AS trip_id_xor
--- FROM `ss2-g16-proyecto2.p2_a_trips.trips_2022_opt`
+-- (e) ¿trips_2022_opt tiene el mismo contenido que la vista del contrato?
+--     Se compara la huella de la fila completa:
+--     BIT_XOR(FARM_FINGERPRINT(TO_JSON_STRING(t))) sobre las 19 columnas.
+--     TO_JSON_STRING depende de los nombres y del orden de las columnas; opt y
+--     la vista tienen las mismas 19 columnas en el mismo orden (verificado en
+--     INFORMATION_SCHEMA.COLUMNS), así que las huellas son comparables.
+--     Desde la fase 2 la vista proyecta opt, así que esta consulta compara opt
+--     consigo mismo. La comprobación con valor real es la línea base: la huella
+--     (f) de la vista en fase 1 frente a la huella de opt. Ambas valen
+--     2642667349256316066 (Proyecto_2/evidencia/06_contrato_fase2.txt).
+--     Esperado: row_count y row_fp iguales en las dos filas.
+-- SELECT 'trips_2022_opt' AS source, COUNT(*) AS row_count,
+--        BIT_XOR(FARM_FINGERPRINT(TO_JSON_STRING(t))) AS row_fp
+-- FROM `ss2-g16-proyecto2.p2_a_trips.trips_2022_opt` AS t
 -- UNION ALL
--- SELECT 'v_trips_clean', COUNT(*), BIT_XOR(trip_id)
--- FROM `ss2-g16-proyecto2.p2_contract.v_trips_clean`;
+-- SELECT 'v_trips_clean', COUNT(*), BIT_XOR(FARM_FINGERPRINT(TO_JSON_STRING(t)))
+-- FROM `ss2-g16-proyecto2.p2_contract.v_trips_clean` AS t;
