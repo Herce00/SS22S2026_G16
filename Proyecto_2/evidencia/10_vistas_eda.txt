@@ -1,0 +1,246 @@
+================================================================================
+10_vistas_eda.txt
+Evidencia de T5 (feature p2-a-eda): publicación de vistas analíticas v_eda_*
+y resumen integral de hallazgos del análisis exploratorio (EDA).
+Script: Proyecto_2/sql/a_06_vistas_eda.sql
+Fuentes: ss2-g16-proyecto2.p2_a_trips.trips_2022_opt (decisión E1) y
+         bigquery-public-data.new_york_taxi_trips.taxi_zone_geom (decisión E2).
+Proyecto: ss2-g16-proyecto2 (ubicación US). Fecha de ejecución: 2026-10-25.
+================================================================================
+
+--------------------------------------------------------------------------------
+Método
+--------------------------------------------------------------------------------
+- Las 4 vistas se publicaron en ss2-g16-proyecto2.p2_a_trips mediante CREATE OR
+  REPLACE VIEW a partir de trips_2022_opt y taxi_zone_geom deduplicado.
+- Para cada vista se midió el costo de consulta completa (dry run de SELECT *),
+  el conteo total de filas y se extrajo una muestra de salida real formateada
+  con bq --format=pretty.
+- Ninguna vista excede el presupuesto ni duplica datos físicos (decisión E5).
+  Se consultan en vivo y aprovechan el particionamiento diario y clustering
+  de la tabla subyacente.
+- El resumen de hallazgos consolida cuantitativamente las evidencias 07, 08,
+  09 y 10. Toda cifra proviene de una salida real de BigQuery.
+
+================================================================================
+Parte 1: Catálogo y métricas de las vistas publicadas
+================================================================================
+
+--------------------------------------------------------------------------------
+V1: ss2-g16-proyecto2.p2_a_trips.v_eda_tendencia_diaria
+Propósito: Alimenta visualizaciones de series de tiempo (evolución de demanda,
+ingresos diarios y media móvil de 7 días para suavizar la estacionalidad).
+--------------------------------------------------------------------------------
+- Dry run: upper bound of 1,948,582,048 bytes (1.95 GB).
+- Total de filas: 335 días (2022-01-01 a 2022-12-01).
+
+Muestra de salida representativa:
++-------------+----------+---------------+--------+-----------+---------------+-------------+-----------+---------------+
+| pickup_date | day_name |   day_type    | trips  | trips_ma7 | total_revenue | revenue_ma7 | avg_total | avg_speed_mph |
++-------------+----------+---------------+--------+-----------+---------------+-------------+-----------+---------------+
+|  2022-01-01 | Sábado   | Fin de semana |  60766 |   60766.0 |    1275527.41 |  1275527.41 |     20.99 |          15.8 |
+|  2022-01-07 | Viernes  | Día hábil     |  68756 |   67798.6 |    1661195.28 |  1414887.02 |     24.16 |         13.82 |
+|  2022-04-01 | Viernes  | Día hábil     | 130333 |  118343.1 |    2752816.96 |  2449427.32 |     21.12 |         11.53 |
+|  2022-07-04 | Lunes    | Día hábil     |  62009 |   92368.6 |    1420841.04 |  2002687.55 |     22.91 |         15.69 |
+|  2022-10-14 | Viernes  | Día hábil     | 122141 |  111733.0 |    2788626.81 |   2537143.5 |     22.83 |         10.93 |
+|  2022-11-24 | Jueves   | Día hábil     |  66358 |   92129.0 |    1376346.15 |  2006375.23 |     20.74 |         14.87 |
+|  2022-12-01 | Jueves   | Día hábil     |     57 |   84539.9 |       1185.16 |  1900475.91 |     20.79 |         10.15 |
++-------------+----------+---------------+--------+-----------+---------------+-------------+-----------+---------------+
+
+--------------------------------------------------------------------------------
+V2: ss2-g16-proyecto2.p2_a_trips.v_eda_hora_dia
+Propósito: Alimenta matrices bidimensionales (mapas de calor 24 horas × 7 días),
+análisis de hora punta y perfiles de congestión horaria.
+--------------------------------------------------------------------------------
+- Dry run: upper bound of 1,670,213,184 bytes (1.67 GB).
+- Total de filas: 168 (24 horas × 7 días de la semana).
+
+Muestra de salida (horas punta de cada día y top 5 global):
++------------+-----------+----------+-------------+---------------+--------+------------------+---------------+-----------+---------------+--------------+-------------+
+| pickup_dow | day_name  | dow_abbr | pickup_hour |   day_type    | trips  | pct_of_day_trips | total_revenue | avg_total | avg_speed_mph | overall_rank | rank_in_day |
++------------+-----------+----------+-------------+---------------+--------+------------------+---------------+-----------+---------------+--------------+-------------+
+|          3 | Martes    | Mar      |          18 | Día hábil     | 390043 |             7.61 |    8002299.46 |     20.52 |         10.56 |            1 |           1 |
+|          4 | Miércoles | Mie      |          18 | Día hábil     | 388816 |             7.36 |    8091784.53 |     20.81 |         10.22 |            2 |           1 |
+|          5 | Jueves    | Jue      |          18 | Día hábil     | 386385 |             7.25 |    8285271.72 |     21.44 |         10.02 |            3 |           1 |
+|          6 | Viernes   | Vie      |          18 | Día hábil     | 377978 |             7.19 |    7864968.56 |     20.81 |         10.66 |            4 |           1 |
+|          3 | Martes    | Mar      |          17 | Día hábil     | 364945 |             7.12 |    7941544.73 |     21.76 |          9.86 |            5 |           2 |
+|          2 | Lunes     | Lun      |          18 | Día hábil     | 336675 |             7.48 |    6901549.48 |      20.5 |         11.99 |           12 |           1 |
+|          7 | Sábado    | Sab      |          18 | Fin de semana | 330209 |             6.51 |    6637722.29 |      20.1 |         10.79 |           14 |           1 |
+|          1 | Domingo   | Dom      |          17 | Fin de semana | 270046 |             6.39 |    6086968.96 |     22.54 |         12.48 |           61 |           1 |
++------------+-----------+----------+-------------+---------------+--------+------------------+---------------+-----------+---------------+--------------+-------------+
+
+--------------------------------------------------------------------------------
+V3: ss2-g16-proyecto2.p2_a_trips.v_eda_zonas
+Propósito: Alimenta mapas geoespaciales de NYC, diagramas de barras de zonas
+de mayor demanda (origen y destino) y distribución por borough.
+--------------------------------------------------------------------------------
+- Dry run: upper bound of 1,447,950,921 bytes (1.45 GB).
+- Total de filas: 263 zonas activas registradas en 2022.
+
+Muestra de salida (top 10 zonas de origen):
++-------------+------------------------------+-----------+--------------+------------------+---------------+-------------------+-------------+----------------+------------------+-----------------+----------------------+-------------+--------------+
+| location_id |          zone_name           |  borough  | pickup_trips | pct_pickup_trips | dropoff_trips | pct_dropoff_trips | total_trips | pickup_revenue | avg_pickup_total | avg_pickup_fare | avg_pickup_speed_mph | pickup_rank | dropoff_rank |
++-------------+------------------------------+-----------+--------------+------------------+---------------+-------------------+-------------+----------------+------------------+-----------------+----------------------+-------------+--------------+
+| 132         | JFK Airport                  | Queens    |      1651005 |             4.74 |        427777 |              1.23 |     2078782 |   101348368.08 |            61.39 |           47.06 |                25.81 |           1 |           34 |
+| 237         | Upper East Side South        | Manhattan |      1641064 |             4.72 |       1425424 |               4.1 |     3066488 |    25700442.14 |            15.66 |            9.91 |                 9.96 |           2 |            2 |
+| 236         | Upper East Side North        | Manhattan |      1458357 |             4.19 |       1500024 |              4.31 |     2958381 |    24072134.69 |            16.51 |           10.61 |                 10.3 |           3 |            1 |
+| 161         | Midtown Center               | Manhattan |      1400467 |             4.02 |       1275107 |              3.66 |     2675574 |    25860426.58 |            18.47 |           12.06 |                 9.79 |           4 |            3 |
+| 186         | Penn Station/Madison Sq West | Manhattan |      1142035 |             3.28 |        785579 |              2.26 |     1927614 |    21151888.64 |            18.52 |           12.33 |                 9.56 |           5 |           15 |
+| 162         | Midtown East                 | Manhattan |      1140842 |             3.28 |        923197 |              2.65 |     2064039 |    20564440.43 |            18.03 |           11.69 |                10.65 |           6 |           10 |
+| 142         | Lincoln Square East          | Manhattan |      1135722 |             3.26 |        955664 |              2.75 |     2091386 |    19405218.19 |            17.09 |           11.03 |                10.81 |           7 |            7 |
+| 170         | Murray Hill                  | Manhattan |      1078034 |              3.1 |       1034919 |              2.97 |     2112953 |    19566977.16 |            18.15 |            11.8 |                10.67 |           8 |            4 |
+| 230         | Times Sq/Theatre District    | Manhattan |      1076478 |             3.09 |       1025955 |              2.95 |     2102433 |    22526928.43 |            20.93 |           14.04 |                10.83 |           9 |            5 |
+| 48          | Clinton East                 | Manhattan |      1066421 |             3.06 |        939059 |               2.7 |     2005480 |    19971476.55 |            18.73 |           12.41 |                11.53 |          10 |            9 |
++-------------+------------------------------+-----------+--------------+------------------+---------------+-------------------+-------------+----------------+------------------+-----------------+----------------------+-------------+--------------+
+
+--------------------------------------------------------------------------------
+V4: ss2-g16-proyecto2.p2_a_trips.v_eda_pagos
+Propósito: Alimenta gráficos de torta/anillo de medios de pago, análisis de
+propina por canal y desglose del comportamiento atípico del código 0.
+--------------------------------------------------------------------------------
+- Dry run: upper bound of 1,496,232,644 bytes (1.50 GB).
+- Total de filas: 6 (los 6 métodos de pago registrados en el año).
+
+Salida completa:
++--------------+--------------------+----------+-----------+---------------+-----------+----------+---------+--------------+------------+------------------+------------------+-----------------+------------------+---------------+
+| payment_type |   payment_label    |  trips   | pct_trips | total_revenue | avg_total | avg_fare | avg_tip | tipped_trips | pct_tipped | avg_tip_rate_pct | p50_tip_rate_pct | avg_distance_mi | avg_duration_min | avg_speed_mph |
++--------------+--------------------+----------+-----------+---------------+-----------+----------+---------+--------------+------------+------------------+------------------+-----------------+------------------+---------------+
+| 0            | Sin código (0)     |  1169077 |      3.36 |   32896450.98 |     28.14 |     20.5 |    3.86 |      1049737 |      89.79 |            20.61 |             23.7 |            4.62 |            20.33 |         13.02 |
+| 1            | Tarjeta de crédito | 26703778 |     76.74 |  587680666.74 |     22.01 |    14.45 |     3.4 |     25738020 |      96.38 |            26.66 |            26.43 |            3.54 |            15.66 |         12.13 |
+| 2            | Efectivo           |  6772717 |     19.46 |  123407687.54 |     18.22 |     14.3 |     0.0 |          615 |       0.01 |              0.0 |              0.0 |            3.47 |            15.53 |         11.85 |
+| 3            | Sin cargo          |    85848 |      0.25 |    1924274.69 |     22.41 |    18.57 |     0.0 |           46 |       0.05 |             0.04 |              0.0 |            3.27 |            13.79 |         12.63 |
+| 4            | Disputa            |    64687 |      0.19 |    1607969.27 |     24.86 |    20.95 |    0.01 |           62 |        0.1 |              0.1 |              0.0 |             3.4 |            14.52 |         12.38 |
+| 5            | Desconocido        |        1 |       0.0 |          11.8 |      11.8 |      8.5 |     0.0 |            0 |        0.0 |              0.0 |              0.0 |             2.0 |             8.42 |         14.26 |
++--------------+--------------------+----------+-----------+---------------+-----------+----------+---------+--------------+------------+------------------+------------------+-----------------+------------------+---------------+
+
+================================================================================
+Parte 2: Resumen integral y estructurado de hallazgos del EDA
+================================================================================
+
+1. Dimensión del volumen y economía del servicio (07_eda_descriptiva.txt)
+--------------------------------------------------------------------------------
+- El conjunto de datos saneado abarca 34,796,108 viajes comerciales distribuidos
+  en 335 días calendarios (2022-01-01 a 2022-12-01), con un promedio de
+  103,869 viajes diarios.
+- La economía total generada alcanzó USD 747,517,061.02 de ingreso bruto,
+  compuesto por USD 509,646,615.43 de tarifas base (fare_amount) y
+  USD 95,230,985.21 en propinas registradas (tip_amount). La distancia total
+  recorrida sumó 123,830,611.15 millas.
+- Las distribuciones de distancia y costo presentan marcado sesgo positivo
+  (cola derecha prolongada): la distancia mediana es 1.91 mi (media 3.56 mi,
+  p95 15.25 mi, p99 20.18 mi); el costo total mediano es USD 15.96 (media
+  USD 21.48, p95 USD 61.85, p99 USD 79.62).
+- El 68.92 % de los viajes son trayectos de corta distancia inferiores a
+  3 millas (18.64 % en el tramo [0, 1) mi y 50.28 % en [1, 3) mi); únicamente
+  el 1.10 % de los viajes supera 20 millas.
+- La tarifa unitaria efectiva decrece fuertemente con la longitud del viaje:
+  en trayectos menores a 1 milla el usuario abona un promedio de 8.77 USD/mi
+  (mediana 7.69 USD/mi), mientras que en viajes de 20 o más millas la tasa cae
+  a 2.76 USD/mi (mediana 2.55 USD/mi), evidenciando el peso del banderazo base.
+- Se detectaron 2,306 viajes (0.0067 %) con velocidades derivadas físicamente
+  imposibles (> 80 mph, con un valor extremo de 3,633.16 mph), y un valor máximo
+  aislado de tarifa de USD 401,092.32, los cuales se documentan como anomalías
+  del sensor sin alterar el dataset original.
+
+2. Estructura de pagos, propinas y el bloque cerrado del código 0 (08_eda_categorica.txt)
+--------------------------------------------------------------------------------
+- La tarjeta de crédito domina ampliamente el mercado con el 76.74 % de los
+  viajes (26,703,778 viajes; USD 587.7M facturados), seguida del efectivo con el
+  19.46 % (6,772,717 viajes; USD 123.4M). Los viajes sin cargo, en disputa y
+  anulados representan en conjunto el 0.44 %.
+- Comprobación de la Decisión E4: Se demostró empíricamente que en los pagos en
+  efectivo las propinas no son digitalizadas en el taxímetro; únicamente 615 de
+  6,772,717 viajes en efectivo (0.01 %) registran propina, frente al 96.38 %
+  en pagos con tarjeta. Por ende, todo estudio de propinas debe ceñirse a
+  tarjetas para no distorsionar las métricas hacia cero.
+- En pagos con tarjeta, la tasa mediana de propina sobre la tarifa es del
+  26.40 % (p25 21.55 %, p75 31.00 %, p99 55.80 %, media 26.66 %). El 3.62 %
+  de los usuarios con tarjeta (965,758 viajes) no deja propina.
+- Caracterización del Código 0: 1,169,077 viajes (3.36 %) figuran con
+  payment_type '0' (fuera de la codificación oficial de TLC 1 a 6). El cruce
+  reveló un bloque 100 % coincidente: exactamente los mismos 1,169,077 viajes
+  tienen passenger_count NULL y rate_code NULL.
+- El 78.77 % del código 0 procede del vendor_id 2, y el 100 % de los viajes
+  registrados por los vendor_id 5 y 6 (46,015 viajes) caen en esta categoría.
+  Presentan trayectos más largos (4.62 mi y 20.33 min) y un total promedio
+  superior (USD 28.14). El 89.79 % registra propina electrónica, lo que sugiere
+  que son viajes despachados por plataformas o convenios corporativos ajenos al
+  taxímetro tradicional (hipótesis).
+
+3. Tarifas reglamentadas y aeropuertos (08_eda_categorica.txt y v_eda_zonas)
+--------------------------------------------------------------------------------
+- La tarifa estándar (rate_code '1.0') engloba el 91.88 % de los viajes
+  (31,970,777 viajes, tarifa mediana de USD 9.50).
+- La tarifa JFK (rate_code '2.0') representa el 3.70 % de los viajes (1,288,971
+  viajes). Se corroboró la hipótesis de la tarifa plana fija: el 99.99 % de los
+  viajes JFK (1,288,845) registra una tarifa exacta de USD 52.00, y el 98.76 %
+  de todos los viajes con fare_amount = 52 en el año corresponden a la tarifa JFK.
+- El Aeropuerto Internacional JFK (zone_id 132) se erige como la zona de origen
+  número 1 en volumen de toda la ciudad (1,651,005 viajes, 4.74 % del total) y
+  el mayor generador individual de ingresos con USD 101,348,368.08 (ticket
+  promedio de USD 61.39 y velocidad media de 25.81 mph).
+- Manhattan ejerce una hegemonía territorial casi absoluta, concentrando el
+  89.50 % de todos los orígenes de la ciudad (31,144,223 viajes, total promedio
+  USD 18.19) y el 100 % del top 10 de zonas de destino (lideradas por Upper
+  East Side North con 1.50M viajes y Upper East Side South con 1.43M).
+- Queens abarca el 8.42 % de los orígenes (2.93M viajes), traccionado por los
+  aeropuertos JFK y LaGuardia, con un promedio de USD 54.00 y 13.15 mi.
+- 447,026 orígenes (1.28 %) y 309,513 destinos (0.89 %) carecen de polígono
+  geométrico en taxi_zone_geom, correspondiendo casi en su totalidad a las zonas
+  264 (Unknown) y 265 (Outside of NYC).
+
+4. Patrones temporales y dinámica de la demanda (09_eda_temporal.txt)
+--------------------------------------------------------------------------------
+- Ciclo Horario: La demanda exhibe una curva ascendente desde la madrugada hasta
+  la tarde, alcanzando su ápice diario a las 18:00 (2,477,600 viajes, 7.12 % del
+  volumen anual), seguido de las 17:00 (6.76 %) y las 19:00 (6.43 %). El mínimo
+  absoluto se registra a las 04:00 (187,054 viajes, 0.54 %).
+- El pico de ingresos económicos ocurre a las 17:00 con USD 51,858,682.20,
+  superando a las 18:00 (USD 51.54M) por efecto de recargos vespertinos y mayor
+  tiempo de viaje.
+- Ciclo Semanal: Los días de mayor actividad semanal son el jueves (5,327,628
+  viajes, 15.31 %; USD 114.97M) y miércoles (15.19 %). En promedio normalizado,
+  el viernes encabeza la demanda con 111,914.1 viajes/día. El domingo registra
+  el menor volumen (4,223,302 viajes, 12.14 %; 87,985.5 viajes/día).
+- Días Hábiles vs. Fines de Semana: Los días laborales (lunes a viernes, 239 días)
+  capturan el 73.29 % del mercado (25,502,030 viajes, 106,703.1 viajes/día).
+  Los fines de semana (sábado y domingo, 96 días) abarcan el 26.71 %
+  (9,294,078 viajes, 96,813.3 viajes/día).
+- Matriz Hora × Día: La hora punta de 6 de los 7 días de la semana (lunes a
+  sábado) se ubica sin excepción a las 18:00. El domingo es el único día cuyo
+  pico se adelanta a las 17:00 (270,046 viajes, rank 61 global). La combinación
+  horaria más concurrida de todo el año es el martes a las 18:00 (390,043 viajes,
+  rank 1 global), seguida del miércoles a las 18:00 (388,816 viajes, rank 2).
+- En las noches y madrugadas de fin de semana (viernes noche a domingo madrugada)
+  se observa un patrón de vida nocturna vigoroso: el sábado a las 00:00 acumula
+  228,224 viajes y el domingo a las 00:00 suma 217,782 viajes, triplicando la
+  actividad de un lunes a esa misma hora (78,016 viajes).
+- Estacionalidad Anual: El servicio experimenta una potente recuperación post-ómicron
+  en febrero (+21.08 % intermensual, +499,030 viajes) y marzo (+21.74 %,
+  +623,150 viajes), estabilizándose sobre 3.4M mensuales durante la primavera.
+  En julio se detecta una contracción del -10.85 % (-370,402 viajes) ligada al
+  receso estival neoyorquino (hipótesis).
+- El clímax anual de volumen se alcanza en octubre con 3,516,529 viajes (10.11 %
+  del total del año, USD 78,598,499.79 facturados). Diciembre cuenta únicamente
+  con 57 registros correspondientes al 2022-12-01.
+- Impactos Climáticos Extremos: El 2022-01-29 (sábado) registró solo 33,007
+  viajes (mínimo histórico del año excluyendo el corte de diciembre), coincidiendo
+  con el impacto del devastador nor'easter que sepultó la ciudad bajo nieve. En
+  contraposición, el récord absoluto de viajes diarios tuvo lugar el 2022-04-01
+  (viernes) con 130,333 viajes.
+
+5. Movilidad y velocidad media urbana (07_eda_descriptiva.txt y 09_eda_temporal.txt)
+--------------------------------------------------------------------------------
+- La velocidad mediana de circulación en la ciudad es de 10.38 mph (media
+  12.11 mph, p25 7.88 mph, p75 14.20 mph).
+- La congestión vehicular y la velocidad media guardan una correlación inversa
+  estricta con el horario: en la hora punta vespertina la velocidad se desploma
+  a su cota mínima (10.32 mph a las 16:00 y 10.38 mph a las 17:00), mientras que
+  en la madrugada se duplica (21.38 mph a las 05:00 y 19.87 mph a las 04:00).
+- Durante los fines de semana, la red vial opera con mucha mayor fluidez: la
+  velocidad media se sitúa en 13.32 mph frente a 11.67 mph en días hábiles
+  (+14.1 % más rápida), permitiendo que los viajes de fin de semana cubran
+  mayor distancia media (3.71 mi vs. 3.50 mi) en menor tiempo promedio
+  (14.88 min vs. 16.12 min).
+- El domingo es el día con tráfico más ágil de la semana (14.30 mph de promedio),
+  mientras que el jueves sufre la circulación más lenta (11.20 mph).
