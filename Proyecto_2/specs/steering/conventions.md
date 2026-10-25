@@ -6,7 +6,7 @@ Reglas de trabajo para ambos integrantes. Arquitectura, zonas y contrato: [archi
 
 | Regla | Detalle |
 |-------|---------|
-| Mensajes | Conventional Commits con alcance `p2-<área>`. Ejemplo: `feat(p2-contract): add v_trips_clean view`. |
+| Mensajes | `<tipo>: <descripción>`, **sin alcance** y con una descripción de **50 caracteres como máximo**. Tipos: `feat` (funcionalidad nueva), `fix` (corrección), `upd` (actualización de algo existente), `ref` (refactor), `docs`, `test`, `chore`. Ejemplo: `feat: add v_trips_clean contract view`. |
 | Autoría | Cada integrante hace commit de su propio trabajo, en commits pequeños y granulares. El historial es la evidencia del trabajo en pareja. |
 | Trailers | Sin trailers de atribución a IA. |
 | Ramas | `feat/p2-a-*` para A, `feat/p2-b-*` para B. Nunca se hace push a la rama del otro. |
@@ -50,7 +50,7 @@ cmd //c "set PYTHONUTF8=1&& bq --project_id=ss2-g16-proyecto2 query --use_legacy
 
 ## Antes de abrir un pull request
 
-- [ ] Los commits siguen Conventional Commits con alcance `p2-<área>` y no llevan trailers de IA.
+- [ ] Los commits siguen `<tipo>: <descripción>`, sin alcance, con una descripción de 50 caracteres como máximo y sin trailers de IA.
 - [ ] Solo se tocan rutas de la zona verde propia, o hay acuerdo explícito para la zona amarilla.
 - [ ] Cada script nuevo tiene encabezado y comentarios por bloque.
 - [ ] Cada consulta nueva pasó por `--dry_run` y sus bytes quedaron registrados.

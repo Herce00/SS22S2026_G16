@@ -112,13 +112,15 @@ Conteos del perfil sobre la tabla completa. Cada conteo es independiente: una fi
 
 ### Split temporal propuesto
 
-Es decisión de B; se registra aquí porque depende de las particiones por fecha. **Pendiente de confirmación por B.**
+Es decisión de B; se registra aquí porque depende de las particiones por fecha. A eligió la opción A el 2026-10-25. **Pendiente de confirmación por B.**
 
-| Conjunto | Periodo |
-|----------|---------|
-| Entrenamiento | enero a septiembre de 2022 |
-| Evaluación | octubre y noviembre de 2022 |
-| Nuevos registros (predicción) | diciembre de 2022 |
+| Conjunto | Periodo | Filas en `v_trips_clean` |
+|----------|---------|--------------------------|
+| Entrenamiento | enero a septiembre de 2022 (`pickup_month` 1–9) | 28,160,489 |
+| Evaluación | octubre de 2022 (`pickup_month` = 10) | 3,516,529 |
+| Nuevos registros (predicción) | noviembre de 2022 (`pickup_month` >= 11) | 3,119,090 |
+
+La fuente no tiene archivo de diciembre: `data_file_month` solo va de 1 a 11. Las 57 filas con `pickup_month` = 12 son viajes del 2022-12-01 que vienen en el archivo de noviembre, y se asignan a "nuevos registros". Evidencia: `Proyecto_2/evidencia/03_contrato_validaciones.txt`. El split original, que usaba diciembre como nuevos registros, se descartó por esta razón.
 
 ## Regla de zonas
 
