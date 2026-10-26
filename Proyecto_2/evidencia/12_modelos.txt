@@ -1,0 +1,364 @@
+================================================================================
+12_modelos.txt
+Evidencia de T3 (feature p2-a-bqml): entrenamiento de los modelos de
+BigQuery ML.
+Script: Proyecto_2/sql/b_02_modelos.sql
+Fuente: ss2-g16-proyecto2.p2_b_ml.features_trips (b_01_features.sql; 2,482,519
+        filas: train 2,008,885, eval 250,744, new 222,890).
+Salidas: ss2-g16-proyecto2.p2_b_ml.m_fare_linreg (M-1),
+         ss2-g16-proyecto2.p2_b_ml.m_fare_linreg_gd (M-2) y
+         ss2-g16-proyecto2.p2_b_ml.m_tip_logreg (M-3).
+Proyecto: ss2-g16-proyecto2 (ubicación US). Fecha de ejecución: 2026-10-25.
+================================================================================
+
+--------------------------------------------------------------------------------
+Método
+--------------------------------------------------------------------------------
+- Cada bloque se extrajo de su etiqueta [M1] a [M3] y [V1] a [V6] del script
+  a un archivo propio, así que el texto ejecutado coincide byte a byte con el
+  bloque.
+- Cada bloque se ejecutó primero con --dry_run y luego real, con
+  --format=pretty. Se quitaron las líneas "Waiting on bqjob".
+- Cada CREATE MODEL se ejecutó con un --job_id determinístico
+  (p2_bqml_m<n>_<unixts>) para ubicarlo en V6.
+- Ningún CREATE MODEL supera el límite de 10 GB; el mayor (M1 y M2) estima
+  192,737,539 bytes.
+- Las opciones de entrenamiento efectivas salen de
+  bq show --format=prettyjson --model ss2-g16-proyecto2:p2_b_ml.<modelo>
+  (campo trainingRuns[].trainingOptions).
+- Aquí solo hay métricas de entrenamiento (ML.TRAINING_INFO). La evaluación
+  sobre octubre y la comparación entre modelos son de T4
+  (13_evaluacion.txt).
+
+--------------------------------------------------------------------------------
+M1: regresión lineal de fare_amount con el optimizador por defecto.
+Pregunta: ¿qué tan bien explican las features conocidas al inicio del viaje la
+tarifa base, sin ajustar hiperparámetros?
+--------------------------------------------------------------------------------
+Dry run: 192737539 bytes.
+
+Job p2_bqml_m1_1792977147:
+Created ss2-g16-proyecto2.p2_b_ml.m_fare_linreg
+
+Opciones efectivas (bq show):
+  modelType LINEAR_REGRESSION, optimizationStrategy NORMAL_EQUATION,
+  dataSplitMethod RANDOM, dataSplitEvalFraction 0.2, l2Regularization 0,
+  lossType MEAN_SQUARED_LOSS, categoryEncodingMethod ONE_HOT_ENCODING,
+  standardizeFeatures true, fitIntercept true, enableGlobalExplain true.
+  featureColumns: pickup_hour, pickup_dow, trip_distance, passenger_count_imp,
+  passenger_missing, pickup_location_id, dropoff_location_id, pickup_borough,
+  dropoff_borough, vendor_id, rate_code_imp.
+
+Con AUTO_STRATEGY, BigQuery eligió la ecuación normal (NORMAL_EQUATION): la
+solución cerrada, en una sola iteración (V1).
+
+--------------------------------------------------------------------------------
+M2: variante de hiperparámetros de la regresión lineal.
+Pregunta: ¿cambia el ajuste al forzar descenso de gradiente con regularización
+L2 sobre los mismos datos y la misma etiqueta?
+--------------------------------------------------------------------------------
+Dry run: 192737539 bytes.
+
+Job p2_bqml_m2_1792977195:
+Created ss2-g16-proyecto2.p2_b_ml.m_fare_linreg_gd
+
+Opciones efectivas (bq show):
+  modelType LINEAR_REGRESSION, optimizationStrategy BATCH_GRADIENT_DESCENT,
+  dataSplitMethod RANDOM, dataSplitEvalFraction 0.2, maxIterations 20,
+  l2Regularization 1, l1Regularization 0, learnRateStrategy LINE_SEARCH,
+  initialLearnRate 0.1, earlyStop true, minRelativeProgress 0.01,
+  lossType MEAN_SQUARED_LOSS, standardizeFeatures true, enableGlobalExplain
+  false. featureColumns: las mismas 11 de M1.
+
+--------------------------------------------------------------------------------
+M3: regresión logística de is_high_tip con split CUSTOM temporal.
+Pregunta: ¿se puede anticipar, al inicio de un viaje pagado con tarjeta, si la
+propina será de al menos el 25 % de la tarifa?
+--------------------------------------------------------------------------------
+Dry run: 177265140 bytes.
+
+Job p2_bqml_m3_1792977428:
+Created ss2-g16-proyecto2.p2_b_ml.m_tip_logreg
+
+Opciones efectivas (bq show):
+  modelType LOGISTIC_REGRESSION, dataSplitMethod CUSTOM, dataSplitColumn
+  is_eval, maxIterations 20, l2Regularization 0.1, l1Regularization 0,
+  learnRateStrategy LINE_SEARCH, initialLearnRate 0.1, earlyStop true,
+  minRelativeProgress 0.01, lossType MEAN_LOG_LOSS, autoClassWeights false,
+  standardizeFeatures true, enableGlobalExplain true.
+  featureColumns: las mismas 11 de M1; is_eval no aparece.
+
+Filas de entrada: 1,538,515 de train (FALSE, entrenamiento) y 194,093 de
+octubre (TRUE, evaluación), según V6 de 11_features.txt.
+
+--------------------------------------------------------------------------------
+V1: iteraciones y pérdida de los tres modelos.
+Pregunta: ¿cuántas iteraciones hizo cada modelo y cómo evolucionaron la
+pérdida de entrenamiento y la de evaluación?
+--------------------------------------------------------------------------------
+Dry run: 0 bytes.
+
++------------------+-----------+--------------------+--------------------+---------------+-------------+
+|      model       | iteration |        loss        |     eval_loss      | learning_rate | duration_ms |
++------------------+-----------+--------------------+--------------------+---------------+-------------+
+| m_fare_linreg    |         0 |   13.0542443547617 | 124.35367816056781 |          NULL |        4065 |
+| m_fare_linreg_gd |         0 |  85.12672250850189 |  85.01063037253843 |           0.1 |        3731 |
+| m_fare_linreg_gd |         1 |  36.74275722026462 |  36.68347608007475 |           0.2 |        6296 |
+| m_fare_linreg_gd |         2 |   31.6573232036068 | 31.664302084169197 |           0.1 |        6185 |
+| m_fare_linreg_gd |         3 | 27.885647752009508 | 27.906984154063224 |           0.2 |        6935 |
+| m_fare_linreg_gd |         4 | 24.264470131439012 | 24.337950700379512 |           0.4 |        6450 |
+| m_fare_linreg_gd |         5 |   23.2574340995944 |  23.31645131178807 |           0.2 |       10800 |
+| m_fare_linreg_gd |         6 |  22.46109746788037 | 22.562327267840388 |           0.2 |        6553 |
+| m_fare_linreg_gd |         7 |  21.72757325222592 | 21.816517166117404 |           0.1 |        6096 |
+| m_fare_linreg_gd |         8 | 21.016036493167945 |  21.11810515955471 |           0.2 |       38048 |
+| m_fare_linreg_gd |         9 | 19.824482913562786 | 19.939217019209515 |           0.4 |        4735 |
+| m_fare_linreg_gd |        10 | 19.188629650804796 |  19.34076132950944 |           0.4 |        4717 |
+| m_fare_linreg_gd |        11 | 18.591103751726948 | 18.729860219816036 |           0.1 |        5587 |
+| m_fare_linreg_gd |        12 |  18.18852629785866 | 18.337313743615756 |           0.2 |        6959 |
+| m_fare_linreg_gd |        13 | 17.496449380814216 | 17.652730444561612 |           0.4 |        5554 |
+| m_fare_linreg_gd |        14 | 17.195242229569295 | 17.368061259037336 |           0.2 |        7789 |
+| m_fare_linreg_gd |        15 | 16.922940232478606 | 17.089829915998084 |           0.2 |        5538 |
+| m_fare_linreg_gd |        16 |   16.6788161132054 |  16.86498534834354 |           0.2 |        7893 |
+| m_fare_linreg_gd |        17 | 16.457125420750344 | 16.638108533886598 |           0.1 |        5125 |
+| m_fare_linreg_gd |        18 |  16.21740677434133 |  16.40492745321418 |           0.2 |        4683 |
+| m_fare_linreg_gd |        19 | 15.790190197592842 |  15.98483954833309 |           0.4 |        4677 |
+| m_tip_logreg     |         0 | 0.6636301400332795 | 0.6669626192011694 |           0.2 |        3896 |
+| m_tip_logreg     |         1 | 0.6407316133897414 | 0.6474148087682231 |           0.4 |        5870 |
+| m_tip_logreg     |         2 | 0.6256195514489973 | 0.6333957086471043 |           0.8 |        4812 |
+| m_tip_logreg     |         3 | 0.6166612883473139 | 0.6253272229052654 |           1.6 |        4703 |
+| m_tip_logreg     |         4 |  0.611080519108994 | 0.6212364452231138 |           3.2 |        5340 |
++------------------+-----------+--------------------+--------------------+---------------+-------------+
+
+Lectura (la pérdida es el error cuadrático medio en las regresiones y la
+log-loss en la logística):
+- M-1 (ecuación normal): 1 iteración, learning_rate NULL. Pérdida de
+  entrenamiento 13.05 y eval_loss 124.35 sobre el 20 % aleatorio de ene-sep:
+  la evaluación interna es 9.5 veces la de entrenamiento. Es una brecha muy
+  grande para un modelo lineal (ver "Hallazgo de M-1" abajo).
+- M-2 (descenso de gradiente): 20 iteraciones, el máximo; early_stop no cortó
+  porque la mejora relativa siguió por encima de 0.01 (de 16.22 a 15.79 en la
+  última, 2.6 %). La pérdida baja de 85.13 a 15.79 y eval_loss de 85.01 a
+  15.98, siempre muy cerca una de otra. LINE_SEARCH ajusta la tasa entre 0.1
+  y 0.4. El modelo no convergió del todo: con más iteraciones la pérdida
+  seguiría bajando (hipótesis).
+- M-3 (logística): 5 iteraciones; early_stop cortó en la iteración 4. La
+  mejora relativa de esa iteración es de 0.90 % en la pérdida (0.6167 a
+  0.6111) y de 0.65 % en eval_loss (0.6253 a 0.6212), las dos por debajo del
+  1 % de minRelativeProgress. Log-loss de 0.6636 a 0.6111 y eval_loss (octubre) de
+  0.6670 a 0.6212. LINE_SEARCH duplica la tasa en cada paso (0.2 a 3.2).
+  Como referencia, la log-loss de un modelo que predice siempre el 60 %
+  sería de unos 0.67 (cálculo propio, -0.6·ln 0.6 - 0.4·ln 0.4).
+
+Cumple: M-2 y M-3 muestran varias iteraciones con su pérdida; M-1 muestra su
+única iteración de la ecuación normal.
+
+--------------------------------------------------------------------------------
+V2: features de entrada de M-1 y M-3.
+Pregunta: ¿qué columnas recibió cada modelo como input y con qué estadísticas?
+--------------------------------------------------------------------------------
+Dry run: 0 bytes.
+
++---------------+---------------------+------+-------+--------------------+--------------------+----------------+------------+
+|     model     |        input        | min  |  max  |        mean        |       stddev       | category_count | null_count |
++---------------+---------------------+------+-------+--------------------+--------------------+----------------+------------+
+| m_fare_linreg | dropoff_borough     | NULL |  NULL |               NULL |               NULL |              7 |          0 |
+| m_fare_linreg | dropoff_location_id | NULL |  NULL |               NULL |               NULL |            260 |          0 |
+| m_fare_linreg | passenger_count_imp |  1.0 |   6.0 |  1.418203986066256 | 0.9480930927502861 |           NULL |          0 |
+| m_fare_linreg | passenger_missing   | NULL |  NULL |               NULL |               NULL |              2 |          0 |
+| m_fare_linreg | pickup_borough      | NULL |  NULL |               NULL |               NULL |              7 |          0 |
+| m_fare_linreg | pickup_dow          | NULL |  NULL |               NULL |               NULL |              7 |          0 |
+| m_fare_linreg | pickup_hour         | NULL |  NULL |               NULL |               NULL |             24 |          0 |
+| m_fare_linreg | pickup_location_id  | NULL |  NULL |               NULL |               NULL |            251 |          0 |
+| m_fare_linreg | rate_code_imp       | NULL |  NULL |               NULL |               NULL |              8 |          0 |
+| m_fare_linreg | trip_distance       | 0.01 | 99.26 |  3.537232806409454 |  4.436999159188244 |           NULL |          0 |
+| m_fare_linreg | vendor_id           | NULL |  NULL |               NULL |               NULL |              4 |          0 |
+| m_tip_logreg  | dropoff_borough     | NULL |  NULL |               NULL |               NULL |              7 |          0 |
+| m_tip_logreg  | dropoff_location_id | NULL |  NULL |               NULL |               NULL |            260 |          0 |
+| m_tip_logreg  | passenger_count_imp |  1.0 |   6.0 | 1.4194031257413868 |  0.952023003487209 |           NULL |          0 |
+| m_tip_logreg  | passenger_missing   | NULL |  NULL |               NULL |               NULL |              1 |          0 |
+| m_tip_logreg  | pickup_borough      | NULL |  NULL |               NULL |               NULL |              7 |          0 |
+| m_tip_logreg  | pickup_dow          | NULL |  NULL |               NULL |               NULL |              7 |          0 |
+| m_tip_logreg  | pickup_hour         | NULL |  NULL |               NULL |               NULL |             24 |          0 |
+| m_tip_logreg  | pickup_location_id  | NULL |  NULL |               NULL |               NULL |            249 |          0 |
+| m_tip_logreg  | rate_code_imp       | NULL |  NULL |               NULL |               NULL |              6 |          0 |
+| m_tip_logreg  | trip_distance       | 0.01 |  98.6 | 3.5156329902536414 |  4.410009129852468 |           NULL |          0 |
+| m_tip_logreg  | vendor_id           | NULL |  NULL |               NULL |               NULL |              2 |          0 |
++---------------+---------------------+------+-------+--------------------+--------------------+----------------+------------+
+
+Cumple: las mismas 11 features en ambos modelos, null_count = 0 en todas y
+sin is_eval en M-3. Las zonas quedan por debajo de la tabla completa (251 y
+260 en M-1, 249 y 260 en M-3, frente a 254 y 261 en V5 de 11_features.txt),
+porque cada modelo ve un subconjunto de filas.
+En M-3, passenger_missing tiene 1 sola categoría, rate_code_imp 6 y
+vendor_id 2: con tarjeta no hay viajes del bloque del código 0
+(passenger_count NULL y rate_code 'NA', M6), así que passenger_missing es
+constante y no aporta información a ese modelo. Que solo aparezcan 2
+vendor_id con tarjeta es un dato observado; su causa no se investigó aquí.
+
+--------------------------------------------------------------------------------
+V3: control de leakage sobre las features de entrada.
+Pregunta: ¿algún modelo recibió una columna excluida (identificador, mes,
+columnas de split, payment_type o etiquetas)?
+--------------------------------------------------------------------------------
+Dry run: 0 bytes.
+
++------------------+------------+------------------+------------------+
+|      model       | n_features | matched_intended | excluded_present |
++------------------+------------+------------------+------------------+
+| m_fare_linreg    |         11 |               11 |                0 |
+| m_fare_linreg_gd |         11 |               11 |                0 |
+| m_tip_logreg     |         11 |               11 |                0 |
++------------------+------------+------------------+------------------+
+
+Cumple: los tres modelos reciben exactamente las 11 features de M2 y ninguna
+de trip_id, pickup_month, split_set, is_eval, payment_type, fare_amount,
+is_tipped ni is_high_tip. En M-3, BigQuery ML excluyó is_eval de las
+features aunque el SELECT la incluye (es la columna del split CUSTOM); bq show
+lo confirma: featureColumns no la lista.
+
+--------------------------------------------------------------------------------
+V4: explicación global de M-1 (10 features con mayor atribución).
+Pregunta: ¿qué features pesan más en la predicción de la tarifa?
+--------------------------------------------------------------------------------
+Dry run: 0 bytes.
+
++---------------------+--------------------+
+|       feature       |    attribution     |
++---------------------+--------------------+
+| dropoff_location_id |  4101.753630950594 |
+| pickup_dow          |  4059.108760971365 |
+| pickup_location_id  | 3827.9813945513574 |
+| pickup_hour         | 2048.0187889543845 |
+| pickup_borough      |  1799.273057226825 |
+| vendor_id           | 1273.7435837693854 |
+| dropoff_borough     | 1105.2019286125014 |
+| passenger_missing   |  551.3316749851122 |
+| rate_code_imp       | 310.06118505786384 |
+| trip_distance       |   7.32831904624324 |
++---------------------+--------------------+
+
+No cumple la hipótesis del script: trip_distance queda última, con 7.33,
+mientras las categóricas tienen atribuciones de miles de dólares, muy por
+encima de la tarifa promedio (14.46, V4 de 11_features.txt). Atribuciones de
+ese tamaño indican pesos grandes que se cancelan entre sí (ver "Hallazgo de
+M-1"). La lista tiene 10 de las 11 features; falta passenger_count_imp.
+
+--------------------------------------------------------------------------------
+V5: explicación global de M-3 (10 features con mayor atribución).
+Pregunta: ¿qué features pesan más en la probabilidad de propina alta?
+--------------------------------------------------------------------------------
+Dry run: 0 bytes.
+
++---------------------+----------------------+
+|       feature       |     attribution      |
++---------------------+----------------------+
+| dropoff_location_id |  0.23272049531971434 |
+| trip_distance       |  0.20844992110312827 |
+| pickup_location_id  |  0.15943202585038135 |
+| pickup_hour         |  0.10072623406184622 |
+| dropoff_borough     |  0.10021674966157744 |
+| rate_code_imp       |  0.08841742417737397 |
+| pickup_borough      |  0.05826179212586921 |
+| pickup_dow          | 0.052675270155381725 |
+| vendor_id           |  0.04890402532718966 |
+| passenger_missing   |  0.04867994138163727 |
++---------------------+----------------------+
+
+Cumple lo esperado: la zona de destino, la distancia y la zona de origen
+encabezan la lista, e is_eval no aparece. passenger_missing tiene una
+atribución de 0.0487 aunque es constante en M-3 (V2); con una sola categoría,
+ese peso actúa como parte del intercepto (hipótesis). Falta
+passenger_count_imp, la undécima feature.
+
+--------------------------------------------------------------------------------
+V6: bytes procesados y facturados de los tres CREATE MODEL.
+Pregunta: ¿cuánto costó entrenar cada modelo, en bytes facturados?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 2848133 bytes.
+
++-----------------------+----------------+-------+--------------+-----------------------+--------------------+---------------+------------+
+|        job_id         | statement_type | state | error_reason | total_bytes_processed | total_bytes_billed | total_slot_ms | duration_s |
++-----------------------+----------------+-------+--------------+-----------------------+--------------------+---------------+------------+
+| p2_bqml_m1_1792977147 | CREATE_MODEL   | DONE  | NULL         |             192737539 |          192937984 |        337156 |         37 |
+| p2_bqml_m2_1792977195 | CREATE_MODEL   | DONE  | NULL         |             192737539 |          192937984 |       1268721 |        203 |
+| p2_bqml_m3_1792977428 | CREATE_MODEL   | DONE  | NULL         |             177265140 |          178257920 |        386959 |         60 |
++-----------------------+----------------+-------+--------------+-----------------------+--------------------+---------------+------------+
+
+Cumple: 3 trabajos CREATE_MODEL en estado DONE y sin error. Los bytes
+procesados coinciden con el dry run de cada bloque. En total se facturaron
+192,937,984 + 192,937,984 + 178,257,920 = 564,133,888 bytes (unos 0.56 GB).
+M-2 usó 3.8 veces los slot-ms de M-1 por sus 20 iteraciones, pero los bytes
+facturados son los mismos: en estos trabajos, el cobro por bytes no depende
+del número de iteraciones. No se calcula el costo en dólares porque la
+tarifa por TB de la creación de modelos no está verificada en la página
+oficial de precios.
+
+--------------------------------------------------------------------------------
+Hallazgo de M-1
+--------------------------------------------------------------------------------
+- Observado: M-1 tiene eval_loss 124.35 frente a una pérdida de entrenamiento
+  de 13.05 (V1), y atribuciones globales de miles en las categóricas con
+  trip_distance en 7.33 (V4). M-2, con los mismos datos y L2, mantiene
+  eval_loss junto a la pérdida (15.98 y 15.79).
+- Hipótesis: la ecuación normal sin regularización (l2Regularization 0) se
+  apoya en features colineales. Cada zona pertenece a un solo borough, así
+  que las columnas one-hot de borough son combinaciones de las de zona; y
+  passenger_missing = TRUE coincide con rate_code_imp = 'NA' en las mismas
+  filas (M6, 82,656 filas de la muestra). Con columnas colineales, la
+  solución puede tener pesos enormes que se cancelan en entrenamiento y
+  fallan en filas con combinaciones poco vistas.
+- No se cambiaron hiperparámetros ni datos de M-1: es el modelo con el
+  optimizador por defecto que pide la tarea, y M-2 ya es la variante
+  regularizada. T4 mide M-1 y M-2 sobre octubre con ML.EVALUATE y confirma o
+  descarta la hipótesis.
+
+--------------------------------------------------------------------------------
+Controles de consistencia
+--------------------------------------------------------------------------------
+- M1, M2 y M3: los tres modelos existen ("Created ...") y sus trabajos están
+  en DONE sin error (V6) (cumple).
+- Dry run de cada CREATE MODEL por debajo de 10 GB: 192,737,539,
+  192,737,539 y 177,265,140 bytes (cumple).
+- V1: M-2 y M-3 muestran iteraciones y pérdida (20 y 5 iteraciones); M-1
+  muestra 1 iteración con NORMAL_EQUATION (cumple).
+- V2 y V3: 11 features en cada modelo, ninguna excluida, is_eval fuera de
+  M-3 (cumple).
+- V6: total_bytes_processed igual al dry run en los tres trabajos (cumple).
+
+--------------------------------------------------------------------------------
+Notas de diseño
+--------------------------------------------------------------------------------
+- M1 (familias de modelos): una regresión lineal para fare_amount (M-1 y su
+  variante M-2) y una regresión logística para is_high_tip (M-3). Así se
+  cubren las métricas de regresión (RMSE, MAE, R²) y de clasificación
+  (ROC-AUC, matriz de confusión) que T4 calcula sobre octubre.
+- M2 (features): solo las 11 features conocidas al inicio del viaje, con una
+  lista explícita en cada SELECT (sin SELECT *). V3 confirma que ningún
+  modelo recibió trip_id, pickup_month, split_set, is_eval, payment_type ni
+  otra etiqueta.
+- M3 (solo tarjeta): M-3 entrena con is_high_tip IS NOT NULL, es decir, solo
+  con payment_type '1'; payment_type no es feature.
+- M4 (split): M-1 y M-2 usan RANDOM con data_split_eval_fraction = 0.2 sobre
+  ene-sep; M-3 usa CUSTOM con is_eval (ene-sep entrena, octubre evalúa).
+  Octubre no ajusta pesos en ningún modelo. En M-3 sí sirve para eval_loss y
+  para el corte por early_stop, así que influye en cuántas iteraciones hace
+  el modelo; sus pesos salen solo de ene-sep. Noviembre ('new') no entra en
+  ningún entrenamiento: queda para las predicciones de T5.
+- Control de leakage: columnas excluidas (las de M2, verificadas en V3),
+  etiqueta de propina solo con tarjeta (M3), split temporal en M-3 (el modelo
+  no aprende del futuro) y exclusión previa de los días anómalos 2022-09-17 y
+  2022-09-18 en features_trips (V0 de 11_features.txt).
+- Diferencias de hiperparámetros entre M-1 y M-2:
+  | Opción              | M-1 (m_fare_linreg)       | M-2 (m_fare_linreg_gd)  |
+  |---------------------|---------------------------|-------------------------|
+  | optimizationStrategy| NORMAL_EQUATION (elegida  | BATCH_GRADIENT_DESCENT  |
+  |                     | por AUTO_STRATEGY)        |                         |
+  | iteraciones         | 1                         | 20 (máximo, sin corte)  |
+  | l2Regularization    | 0                         | 1.0                     |
+  | learnRateStrategy   | no aplica                 | LINE_SEARCH (inicial    |
+  |                     |                           | 0.1)                    |
+  | earlyStop           | no aplica                 | true (min 0.01)         |
+  | enableGlobalExplain | true                      | false                   |
+  Datos, etiqueta, features y split son iguales.
+- M5 (costo): la muestra de 2.48 millones de filas deja cada CREATE MODEL por
+  debajo de 0.2 GB facturados; los tres suman 564,133,888 bytes.
