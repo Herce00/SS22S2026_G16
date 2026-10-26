@@ -226,12 +226,151 @@ Para alimentar de forma directa el tablero interactivo de Looker Studio construi
 *(Sección reservada para la documentación de Persona B — César Rolando Hernández Palacios)*
 
 ### 8.1 Modelos de Machine Learning en BigQuery ML
-- **Arquitectura de Modelos:** Documentación de al menos 2 modelos predictivos entrenados sobre `p2_contract.v_trips_clean` (ej. Regresión Lineal / Boosted Trees / Rolling Forecast).
-- **Hiperparámetros y Entrenamiento:** Opciones de entrenamiento, `data_split_eval_fraction` y split temporal.
-- **Métricas de Evaluación:** Comparativa de desempeño (RMSE, MAE, $R^2$ o ROC-AUC).
-- **Predicciones sobre Nuevos Datos:** Resultados y tablas `pred_*` generadas sobre el conjunto de predicción (noviembre/diciembre 2022).
+
+> [!NOTE]
+> **Reasignación (decisión D8 del steering, 2026-10-25, pendiente de confirmación por Persona B):** Persona A construyó las features, los modelos, la evaluación y las predicciones en `p2_b_ml`. Persona B conserva el tablero de Looker Studio, la comparación "Rolling Forecast", las vistas `v_dash_*`, la sección 8.2 y las capturas.
+
+Cada cifra de esta sección sale de una salida guardada:
+
+| Paso | Script | Evidencia |
+|---|---|---|
+| Tabla de features | `sql/b_01_features.sql` | `evidencia/11_features.txt` |
+| Entrenamiento | `sql/b_02_modelos.sql` | `evidencia/12_modelos.txt` |
+| Evaluación | `sql/b_03_evaluacion.sql` | `evidencia/13_evaluacion.txt` |
+| Predicciones | `sql/b_04_predicciones.sql` | `evidencia/14_predicciones.txt` |
+
+#### Dataset de entrenamiento: `p2_b_ml.features_trips`
+
+- **Origen:** `p2_contract.v_trips_clean`, con una muestra determinística `MOD(trip_id, 14) = 0` de 2,486,865 filas. Se quitan 50 filas con `fare_amount > 300` y 4,296 de los días anómalos; quedan **2,482,519 filas** (F0, F1 y V0 de `11_features.txt`).
+- **Split temporal:** `train` = enero a septiembre (2,008,885 filas), `eval` = octubre (250,744) y `new` = noviembre más el 2022-12-01 (222,890), que son los "nuevos registros" (V1 de `11_features.txt`).
+- **11 features, todas conocidas al inicio del viaje:** `pickup_hour` y `pickup_dow` (como texto, para que sean categóricas), `trip_distance`, `passenger_count_imp`, `passenger_missing`, `pickup_location_id`, `dropoff_location_id`, `pickup_borough`, `dropoff_borough`, `vendor_id` y `rate_code_imp`.
+- **Imputación:** `passenger_count` nulo pasa a 1, con la marca `passenger_missing`, y `rate_code` nulo pasa a `'NA'`.
+- **Etiquetas:**
+  - `fare_amount` para la regresión.
+  - `is_high_tip` (`tip_amount / fare_amount >= 0.25`, solo con tarjeta) para la clasificación. Es TRUE en el 60.01 % de los viajes con tarjeta (V6). No se usó `is_tipped` porque es TRUE en el 96.40 %: un modelo que siempre dice "sí" ya tendría 96 % de exactitud.
+
+#### Modelos
+
+| Modelo | Tipo y etiqueta | Optimizador | Split | Hiperparámetros | Por qué existe |
+|---|---|---|---|---|---|
+| **M-1** `m_fare_linreg` | `LINEAR_REG`, `fare_amount` | Por defecto (`AUTO_STRATEGY`). BigQuery eligió `NORMAL_EQUATION` y resolvió en 1 iteración | `RANDOM`, `data_split_eval_fraction = 0.2` sobre ene–sep | `l2_reg` 0 (sin regularización), `enable_global_explain` | Referencia de regresión sin ajustar hiperparámetros |
+| **M-2** `m_fare_linreg_gd` | `LINEAR_REG`, `fare_amount` | `BATCH_GRADIENT_DESCENT` con `LINE_SEARCH` (tasa inicial 0.1) | Igual que M-1 | `max_iterations` 20 (las usó todas), `l2_reg` 1.0, `early_stop` con progreso mínimo de 0.01 | Variante de hiperparámetros: muestra la curva de iteraciones y pérdida, y la regularización L2 acota los pesos |
+| **M-3** `m_tip_logreg` | `LOGISTIC_REG`, `is_high_tip` | Iterativo con `LINE_SEARCH` (tasa inicial 0.1) | `CUSTOM` con `data_split_col = 'is_eval'`: ene–sep entrena y octubre evalúa | `max_iterations` 20 (`early_stop` cortó en 5), `l2_reg` 0.1 | Familia de clasificación: ROC-AUC, precisión, recall y matriz de confusión |
+
+Entrenamiento (V1 de `12_modelos.txt`):
+
+- **M-1:** pérdida de entrenamiento (MSE) 13.05 y `eval_loss` 124.35 sobre el 20 % aleatorio.
+- **M-2:** la pérdida baja de 85.13 a 15.79 en 20 iteraciones y `eval_loss` termina en 15.98.
+- **M-3:** la log-loss baja de 0.6636 a 0.6111 y `eval_loss` (octubre) termina en 0.6212.
+
+#### Control de data leakage
+
+- **Solo features conocidas al inicio del viaje.** Quedan fuera de la tabla `trip_duration_min`, `total_amount`, `tip_amount` y `tolls_amount`, que solo se conocen al terminar. Ningún modelo recibe `trip_id`, `pickup_month`, `split_set`, `is_eval`, `payment_type` ni la etiqueta del otro modelo. `ML.FEATURE_INFO` confirma 11 features y 0 columnas excluidas en los tres modelos (V3 de `12_modelos.txt`).
+  - Supuesto explícito: `trip_distance` se trata como la distancia estimada de la ruta, conocida al reservar. En el dato real es la distancia medida al terminar.
+- **Etiqueta de propina solo con tarjeta.** En efectivo la propina casi nunca se registra (sección 6, eje 2). Con todos los pagos, el modelo aprendería "efectivo = sin propina", así que `payment_type` no es feature.
+- **`pickup_month` excluido.** Se usa solo para el split. Los modelos entrenan con los meses 1 a 9, así que octubre y noviembre serían valores nunca vistos.
+- **Split temporal más los dos mecanismos del enunciado.** Ningún modelo aprende del futuro: train es ene–sep, eval es octubre y new es noviembre.
+  - M-1 y M-2 usan `data_split_method = 'RANDOM'` con `data_split_eval_fraction = 0.2` dentro de ene–sep.
+  - M-3 usa `data_split_method = 'CUSTOM'` con la columna temporal `is_eval`.
+  - Octubre no ajusta pesos en ningún modelo. En M-3 sí define `eval_loss` y el corte por `early_stop`, así que la evaluación se repitió sobre noviembre, que ningún modelo usó.
+- **Días anómalos excluidos.** El 2022-09-17 y el 2022-09-18 tienen datos faltantes en la fuente, y se quitaron 4,296 filas de la muestra (V0 de `11_features.txt`).
+- **Valores extremos excluidos.** Se quitaron 50 filas con `fare_amount > 300` (0.002 %). El umbral queda sobre el p99.99 de la muestra (216) y quita valores como 395,844.94 (F0).
+
+#### Métricas sobre datos de retención
+
+Regresión de `fare_amount` (E7a de `13_evaluacion.txt`; RMSE y MAE en USD):
+
+| Conjunto | Modelo | RMSE | MAE | R² |
+|---|---|---:|---:|---:|
+| Octubre (250,744) | M-1 `m_fare_linreg` | 3.93 | 2.01 | 0.915 |
+| Octubre | M-2 `m_fare_linreg_gd` | 4.32 | 2.56 | 0.898 |
+| Octubre | Baseline tarifa por milla | 12.52 | 6.06 | 0.143 |
+| Octubre | Baseline media de `train` | 13.54 | 8.70 | -0.003 |
+| Noviembre (222,890) | M-1 `m_fare_linreg` | **15.27** | 2.04 | **-0.299** |
+| Noviembre | M-2 `m_fare_linreg_gd` | 4.24 | 2.55 | 0.900 |
+| Noviembre | Baseline tarifa por milla | 12.30 | 6.04 | 0.158 |
+| Noviembre | Baseline media de `train` | 13.42 | 8.63 | -0.003 |
+
+Clasificación de `is_high_tip` con umbral 0.5 (E7b de `13_evaluacion.txt`):
+
+| Conjunto | Modelo | Exactitud | Precisión | Recall | F1 | log_loss | ROC-AUC |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Octubre (194,093) | M-3 `m_tip_logreg` | 0.666 | 0.654 | 0.917 | 0.763 | 0.621 | 0.692 |
+| Octubre | Baseline clase mayoritaria | 0.587 | 0.587 | 1.000 | 0.740 | 0.678 | 0.500 |
+| Noviembre (172,626) | M-3 `m_tip_logreg` | 0.667 | 0.655 | 0.921 | 0.766 | 0.620 | 0.692 |
+| Noviembre | Baseline clase mayoritaria | 0.590 | 0.590 | 1.000 | 0.742 | 0.677 | 0.500 |
+
+- **Matriz de confusión de M-3 en octubre (E4a):** 104,522 verdaderos positivos, 24,709 verdaderos negativos, 55,396 falsos positivos y 9,466 falsos negativos.
+- **Lectura:** M-3 supera al baseline por 7.85 puntos de exactitud en octubre y 7.72 en noviembre, pero su separación es moderada.
+  - Sus probabilidades no pasan de 0.828 (E4c).
+  - El 69 % de los viajes sin propina alta se clasifica como TRUE.
+  - Hipótesis: la propina depende de factores que no se conocen al inicio del viaje.
+
+#### Hallazgo: M-1 frente a M-2
+
+En octubre M-1 rinde algo mejor que M-2. En noviembre colapsa: su RMSE pasa de 3.93 a 15.27 y su R² cae a -0.299, peor que predecir la media. M-2 se mantiene estable.
+
+- **Observado:**
+  - 14 filas de noviembre, de 222,890, concentran el 94.1 % del error cuadrático de M-1 (E6e).
+  - Las tres peores predicciones son 5,854.20, 3,516.81 y -1,545.89, para tarifas reales de 17.00, 24.66 y 25.00. Sus zonas de origen tienen 0, 0 y 1 fila en `train`. M-2 predice 32.19, 21.68 y 23.09 para esas mismas filas (E6d).
+  - Los pesos de M-1 llegan a 20,163 en valor absoluto, y 555 de 573 superan 1,000. En M-2 el máximo es 35.97 (E6a).
+- **Probado en los datos:** hay colinealidad exacta en `train` (E6c).
+  - Cada zona pertenece a un solo borough.
+  - `passenger_missing` coincide fila a fila con `rate_code_imp = 'NA'`.
+- **Hipótesis:**
+  - La ecuación normal sin regularización reparte la colinealidad en pesos enormes que se compensan entre sí.
+  - Una zona sin peso aprendido deja sin compensar el peso de su borough, y la predicción se dispara.
+  - El mismo mecanismo explicaría el `eval_loss` de 124.35 en el entrenamiento.
+  - La regularización L2 de M-2 mantiene los pesos acotados y evita esta falla.
+
+#### Modelo seleccionado
+
+**M-2 (`m_fare_linreg_gd`)** para la tarifa.
+
+- Es estable en los dos meses: RMSE 4.32 y 4.24, R² 0.898 y 0.900.
+- Baja el RMSE del mejor baseline un 65.5 % en ambos meses.
+- M-1 tiene menor MAE, pero un modelo que puede predecir USD 5,854 para un viaje de USD 17 no es confiable en producción.
+
+M-3 queda como el modelo de clasificación. Supera al baseline, pero su poder de separación es moderado.
+
+#### Predicciones sobre nuevos registros (noviembre)
+
+| Objeto | Filas | Contenido |
+|---|---:|---|
+| `p2_b_ml.pred_fare_nov` | 222,890 | Una fila por viaje: `trip_id`, `pickup_date`, `pickup_hour`, `pickup_borough`, `trip_distance`, `fare_actual`, `pred_fare_m1`, `pred_fare_m2`, `abs_err_m1` y `abs_err_m2` |
+| `p2_b_ml.pred_tip_nov` | 172,626 | Viajes con tarjeta: `trip_id`, `pickup_date`, `pickup_hour`, `pickup_borough`, `is_high_tip_actual`, `prob_high_tip` y `pred_is_high_tip` |
+| `p2_b_ml.v_ml_pred_diaria` | 31 | Serie diaria con viajes, totales real / M-1 / M-2, diferencia porcentual, MAE diario y media móvil de 7 días del total real y del de M-2. `is_partial_day` marca el 2022-12-01 (1 viaje de la muestra) |
+
+Resultados (`14_predicciones.txt`):
+
+- **Validación:** las métricas recalculadas desde las tablas coinciden con las de noviembre de `ML.EVALUATE` (P3b y P3c).
+- **Totales:** en el mes, M-2 predice un total 3.41 % menor que el real y M-1 un 2.63 % menor (P5b).
+- **Por día:** en los 30 días completos, M-2 va de -6.34 % a +5.19 % y subestima en 27 (P4a). Una tarifa promedio más alta en noviembre (15.15) que en ene–sep (14.46) es una causa compatible (hipótesis).
+- **Efecto de las predicciones extremas de M-1:** distorsionan los agregados chicos.
+  - Mueven el total de 3 días entre 1.2 y 4.8 puntos (P4c).
+  - Dominan Staten Island (+1,016.3 %) y el Bronx (+61.58 %) (P4b).
+  - En el total del mes su efecto neto es del 0.19 %.
+- **Base del tablero:** `v_ml_pred_diaria` es la base de datos para la comparación "(Rolling Forecast)" del tablero. Cómo define el curso el "Rolling Forecast" sigue siendo una consulta abierta al auxiliar (Q1 del steering); Persona B decide la visualización final.
+
+#### Costo
+
+| Trabajo | Bytes facturados |
+|---|---:|
+| `CREATE MODEL` M-1 | 192,937,984 |
+| `CREATE MODEL` M-2 | 192,937,984 |
+| `CREATE MODEL` M-3 | 178,257,920 |
+| **Total** | **564,133,888 (unos 0.56 GB)** |
+
+- Fuente: V6 de `12_modelos.txt`.
+- M-2 usó 3.8 veces los slot-ms de M-1 por sus 20 iteraciones, pero facturó los mismos bytes.
+- No se calcula el costo en dólares: la tarifa por TB de la creación de modelos no está verificada en la página oficial de precios.
+- Dry runs fuera del entrenamiento: los 15 bloques de evaluación suman 2,197,915,615 bytes (`13_evaluacion.txt`) y los 10 de predicción 565,482,592 (`14_predicciones.txt`). Esas cifras son estimaciones, no bytes facturados.
 
 ### 8.2 Tablero Interactivo Looker Studio
 - **Enlace al Tablero:** [Enlace público al reporte interactivo en Looker Studio]
 - **Visualizaciones Exploratorias:** Visualización de patrones temporales, mapa coroplético de zonas y distribución de propinas/pagos conectados a las vistas `v_eda_*`.
 - **Visualizaciones Predictivas:** Gráficas de contraste entre valores reales y predicciones de los modelos ML.
+- **Fuentes para conectar:**
+  - `p2_a_trips.v_eda_*`: las 4 vistas de la sección 7.
+  - `p2_b_ml.v_ml_pred_diaria`: la serie diaria de real frente a predicho.
+  - `p2_b_ml.pred_fare_nov` y `p2_b_ml.pred_tip_nov`: las predicciones por viaje.
