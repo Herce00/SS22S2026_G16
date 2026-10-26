@@ -31,21 +31,47 @@ V1: ss2-g16-proyecto2.p2_a_trips.v_eda_tendencia_diaria
 Propósito: Alimenta visualizaciones de series de tiempo (evolución de demanda,
 ingresos diarios y media móvil de 7 días para suavizar la estacionalidad).
 --------------------------------------------------------------------------------
-- Dry run: upper bound of 1,948,582,048 bytes (1.95 GB).
+- Recreada después de la revisión review-5cb79f936ff5075f con dos columnas
+  BOOL de calidad del día, excluyentes entre sí:
+  - is_anomalous_day: regla horaria de T8a (09_eda_temporal.txt). Una hora es
+    anómala si tiene menos del 10 % de la mediana de su franja (día de la
+    semana, hora); el día es anómalo con al menos una hora anómala. Solo se
+    comparan las horas presentes.
+  - is_partial_day: marca el 2022-12-01 (57 viajes). Se eligió una columna
+    aparte, más simple de filtrar en el tablero que un motivo de texto.
+- Dry run de SELECT *: upper bound of 2,226,950,912 bytes (2.23 GB). Antes de
+  agregar los indicadores era 1,948,582,048 bytes (1.95 GB); la regla horaria
+  lee además pickup_hour.
 - Total de filas: 335 días (2022-01-01 a 2022-12-01).
 
-Muestra de salida representativa:
-+-------------+----------+---------------+--------+-----------+---------------+-------------+-----------+---------------+
-| pickup_date | day_name |   day_type    | trips  | trips_ma7 | total_revenue | revenue_ma7 | avg_total | avg_speed_mph |
-+-------------+----------+---------------+--------+-----------+---------------+-------------+-----------+---------------+
-|  2022-01-01 | Sábado   | Fin de semana |  60766 |   60766.0 |    1275527.41 |  1275527.41 |     20.99 |          15.8 |
-|  2022-01-07 | Viernes  | Día hábil     |  68756 |   67798.6 |    1661195.28 |  1414887.02 |     24.16 |         13.82 |
-|  2022-04-01 | Viernes  | Día hábil     | 130333 |  118343.1 |    2752816.96 |  2449427.32 |     21.12 |         11.53 |
-|  2022-07-04 | Lunes    | Día hábil     |  62009 |   92368.6 |    1420841.04 |  2002687.55 |     22.91 |         15.69 |
-|  2022-10-14 | Viernes  | Día hábil     | 122141 |  111733.0 |    2788626.81 |   2537143.5 |     22.83 |         10.93 |
-|  2022-11-24 | Jueves   | Día hábil     |  66358 |   92129.0 |    1376346.15 |  2006375.23 |     20.74 |         14.87 |
-|  2022-12-01 | Jueves   | Día hábil     |     57 |   84539.9 |       1185.16 |  1900475.91 |     20.79 |         10.15 |
-+-------------+----------+---------------+--------+-----------+---------------+-------------+-----------+---------------+
+V1c: validación (dry run: upper bound of 1,113,475,456 bytes).
++-----------+----------------+-------------+----------------+------------------------+--------------+---------------+------------+
+| view_rows | distinct_dates | total_trips | anomalous_days |    anomalous_dates     | partial_days | partial_dates | both_flags |
++-----------+----------------+-------------+----------------+------------------------+--------------+---------------+------------+
+|       335 |            335 |    34796108 |              2 | 2022-09-17, 2022-09-18 |            1 | 2022-12-01    |          0 |
++-----------+----------------+-------------+----------------+------------------------+--------------+---------------+------------+
+
+Cumple: 335 filas y 335 fechas, suma de 34,796,108 viajes, is_anomalous_day
+solo en 2022-09-17 y 2022-09-18, is_partial_day solo en 2022-12-01 y ningún
+día con los dos indicadores.
+
+V1d: muestra alrededor de los días marcados (dry run: upper bound of
+1,391,844,320 bytes).
++-------------+-----------+------------------+----------------+--------+-----------+---------------+-----------+
+| pickup_date | day_name  | is_anomalous_day | is_partial_day | trips  | trips_ma7 | total_revenue | avg_total |
++-------------+-----------+------------------+----------------+--------+-----------+---------------+-----------+
+|  2022-01-29 | Sábado    |            false |          false |  33007 |   78170.9 |     571314.07 |     17.31 |
+|  2022-03-13 | Domingo   |            false |          false |  96285 |  111822.1 |    2034387.31 |     21.13 |
+|  2022-09-16 | Viernes   |            false |          false | 120413 |  113622.6 |     2734771.1 |     22.71 |
+|  2022-09-17 | Sábado    |             true |          false |  56859 |  105618.7 |     1217502.6 |     21.41 |
+|  2022-09-18 | Domingo   |             true |          false |   3832 |   92303.7 |     115800.08 |     30.22 |
+|  2022-09-19 | Lunes     |            false |          false | 101200 |   91587.4 |    2365850.54 |     23.38 |
+|  2022-11-30 | Miércoles |            false |          false | 112342 |   94011.4 |    2533542.78 |     22.55 |
+|  2022-12-01 | Jueves    |            false |           true |     57 |   84539.9 |       1185.16 |     20.79 |
++-------------+-----------+------------------+----------------+--------+-----------+---------------+-----------+
+
+El 2022-01-29 (demanda baja real) y el 2022-03-13 (23 horas por el cambio de
+horario) no se marcan.
 
 --------------------------------------------------------------------------------
 V2: ss2-g16-proyecto2.p2_a_trips.v_eda_hora_dia
@@ -75,7 +101,21 @@ Propósito: Alimenta mapas geoespaciales de NYC, diagramas de barras de zonas
 de mayor demanda (origen y destino) y distribución por borough.
 --------------------------------------------------------------------------------
 - Dry run: upper bound of 1,447,950,921 bytes (1.45 GB).
-- Total de filas: 263 zonas activas registradas en 2022.
+- Total de filas: 263, una por location_id con actividad en 2022. El
+  encabezado de a_06_vistas_eda.sql decía 264; se corrigió a 263 según V3c.
+
+V3c: validación de la deduplicación de zonas (dry run: upper bound of
+334,475,465 bytes).
++------------+--------------------+----------------------+-----------+-------------------------+------------------------+
+| zones_rows | zones_distinct_ids | zones_one_row_per_id | view_rows | view_distinct_locations | view_rows_without_zone |
++------------+--------------------+----------------------+-----------+-------------------------+------------------------+
+|        260 |                260 |                 true |       263 |                     263 |                      4 |
++------------+--------------------+----------------------+-----------+-------------------------+------------------------+
+
+La subconsulta SELECT DISTINCT de zonas tiene 260 filas y 260 zone_id
+distintos (cumple: una fila por zone_id), así que el LEFT JOIN no duplica
+ubicaciones. La vista tiene 263 filas y 263 location_id distintos: 259 con
+zona en taxi_zone_geom y 4 sin zona (57, 105, 264 y 265, borough 'Sin zona').
 
 Muestra de salida (top 10 zonas de origen):
 +-------------+------------------------------+-----------+--------------+------------------+---------------+-------------------+-------------+----------------+------------------+-----------------+----------------------+-------------+--------------+
@@ -223,11 +263,21 @@ Parte 2: Resumen integral y estructurado de hallazgos del EDA
 - El clímax anual de volumen se alcanza en octubre con 3,516,529 viajes (10.11 %
   del total del año, USD 78,598,499.79 facturados). Diciembre cuenta únicamente
   con 57 registros correspondientes al 2022-12-01.
-- Impactos Climáticos Extremos: El 2022-01-29 (sábado) registró solo 33,007
-  viajes (mínimo histórico del año excluyendo el corte de diciembre), coincidiendo
-  con el impacto del devastador nor'easter que sepultó la ciudad bajo nieve. En
-  contraposición, el récord absoluto de viajes diarios tuvo lugar el 2022-04-01
-  (viernes) con 130,333 viajes.
+- Días con datos faltantes en la fuente: el día de menor volumen del año
+  (excluyendo el día parcial 2022-12-01) es el 2022-09-18 (domingo, 3,832
+  viajes), y el 2022-09-17 queda incompleto desde las 15:00 (56,859 viajes).
+  Son días anómalos por datos faltantes, no por demanda baja: desde las 15:00
+  del 17 hasta las 23:00 del 18 cada hora tiene entre el 2.56 % y el 7.71 %
+  de la mediana de su franja (T8a y T8b de 09_eda_temporal.txt), y la tabla
+  pública ya trae solo 59,501 y 4,229 viajes esos días (T8d). Hipótesis:
+  archivo de origen incompleto. v_eda_tendencia_diaria los marca con
+  is_anomalous_day.
+- Impactos Climáticos Extremos: el día normal de menor demanda es el
+  2022-01-29 (sábado), con 33,007 viajes (T5a de 09_eda_temporal.txt) y sin
+  horas anómalas (hipótesis: coincide con la tormenta invernal nor'easter del
+  28 y 29 de enero de 2022; es contexto externo, no se deriva de los datos).
+  En contraposición, el récord absoluto de viajes diarios tuvo lugar el
+  2022-04-01 (viernes) con 130,333 viajes.
 
 5. Movilidad y velocidad media urbana (07_eda_descriptiva.txt y 09_eda_temporal.txt)
 --------------------------------------------------------------------------------

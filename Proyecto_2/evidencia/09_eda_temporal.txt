@@ -15,7 +15,11 @@ Método
   --format=pretty. Se quitaron las líneas "Waiting on bqjob".
 - El dry run sobre opt es una cota superior ("upper bound"). Ninguna consulta
   supera el límite de 10 GB; la mayor (T6) estima 1,670,213,184 bytes.
-- Los percentiles salen de APPROX_QUANTILES(x, 100) y son aproximados.
+- Los percentiles salen de APPROX_QUANTILES(x, 100) y son aproximados. Las
+  medianas de T8 salen de PERCENTILE_CONT(x, 0.5) y son exactas.
+- T5a y T8 se ejecutaron después de la revisión review-5cb79f936ff5075f
+  (corrección de T5a y nueva detección de días anómalos). T8d lee la tabla
+  pública tlc_yellow_trips_2022 solo para contrastar con la fuente.
 - speed_mph excluye viajes de menos de 1 minuto para evitar distorsiones por
   duraciones cercanas a cero.
 
@@ -182,15 +186,20 @@ T5a: días extremos de demanda (top 5 mayor y top 5 menor).
 Pregunta: ¿cuáles fueron los días atípicos de máxima y mínima actividad en el
 año y qué factores contextuales o climáticos los explican?
 --------------------------------------------------------------------------------
-Dry run: upper bound of 556737728 bytes.
+Dry run: upper bound of 556736816 bytes.
+Corrección (revisión review-5cb79f936ff5075f): el 2022-12-01 ahora se excluye
+en el CTE daily, antes del RANK. La versión anterior lo filtraba después del
+RANK, así que el 2022-12-01 ocupaba el rango 1 y la lista de menor demanda
+mostraba solo 4 días (rangos 2 a 5).
 
 +---------------------+----------+-------------+----------+--------+-----------+---------------+
 |      category       | rank_pos | pickup_date | day_name | trips  | trips_ma7 | total_revenue |
 +---------------------+----------+-------------+----------+--------+-----------+---------------+
-| Top 5 menor demanda |        2 |  2022-09-18 | Domingo  |   3832 |   92303.7 |     115800.08 |
-| Top 5 menor demanda |        3 |  2022-01-29 | Sábado   |  33007 |   78170.9 |     571314.07 |
-| Top 5 menor demanda |        4 |  2022-01-02 | Domingo  |  55782 |   58274.0 |    1272057.17 |
-| Top 5 menor demanda |        5 |  2022-09-17 | Sábado   |  56859 |  105618.7 |     1217502.6 |
+| Top 5 menor demanda |        1 |  2022-09-18 | Domingo  |   3832 |   92303.7 |     115800.08 |
+| Top 5 menor demanda |        2 |  2022-01-29 | Sábado   |  33007 |   78170.9 |     571314.07 |
+| Top 5 menor demanda |        3 |  2022-01-02 | Domingo  |  55782 |   58274.0 |    1272057.17 |
+| Top 5 menor demanda |        4 |  2022-09-17 | Sábado   |  56859 |  105618.7 |     1217502.6 |
+| Top 5 menor demanda |        5 |  2022-01-01 | Sábado   |  60766 |   60766.0 |    1275527.41 |
 | Top 5 mayor demanda |        1 |  2022-04-01 | Viernes  | 130333 |  118343.1 |    2752816.96 |
 | Top 5 mayor demanda |        2 |  2022-05-12 | Jueves   | 128042 |  115265.1 |    2802438.15 |
 | Top 5 mayor demanda |        3 |  2022-06-09 | Jueves   | 127753 |  116708.4 |    2861526.86 |
@@ -198,8 +207,14 @@ Dry run: upper bound of 556737728 bytes.
 | Top 5 mayor demanda |        5 |  2022-05-05 | Jueves   | 126933 |  114056.4 |    2751620.98 |
 +---------------------+----------+-------------+----------+--------+-----------+---------------+
 
-El mínimo anual del 2022-01-29 (33,007 viajes) corresponde a la gran ventisca
-histórica de nieve en Nueva York (nor'easter). 4 de los 5 días pico son jueves.
+Los 5 días de menor demanda reales son 2022-09-18 (3,832), 2022-01-29
+(33,007), 2022-01-02 (55,782), 2022-09-17 (56,859) y 2022-01-01 (60,766).
+El 2022-09-18 y el 2022-09-17 son días con datos faltantes en la fuente
+(T8a, T8b y T8d), no días de demanda baja. El día normal de menor demanda es
+el 2022-01-29 (33,007 viajes), sin horas anómalas en T8a (hipótesis: coincide
+con la tormenta invernal nor'easter del 28 y 29 de enero de 2022; es contexto
+externo, no se deriva de los datos). 4 de los 5 días de mayor demanda son
+jueves.
 
 --------------------------------------------------------------------------------
 T5b: tendencia diaria con media móvil de 7 días (muestra de serie).
@@ -333,6 +348,120 @@ Control: la suma de card_trips es 26,703,778 (cumple, idéntico a C1 y C8b de
 08_eda_categorica.txt).
 
 --------------------------------------------------------------------------------
+T8a: días anómalos por datos faltantes (regla horaria adoptada).
+Pregunta: ¿qué días tienen horas con un volumen tan bajo que solo se explica
+por datos faltantes y no por una demanda baja real?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 835105224 bytes.
+Regla: una hora es anómala si sus viajes son menos del 10 % de la mediana
+(PERCENTILE_CONT) de su franja (día de la semana, hora) en el año; un día es
+anómalo si tiene al menos una hora anómala. El 2022-12-01 queda fuera de la
+referencia y de la lista porque ya se trata como día parcial. Solo se comparan
+las horas presentes. La consulta lista los días anómalos y los días con menos
+de 24 horas.
+
++-------------+----------+-------+---------------+-------------------+----------------------+---------------------+------------------+
+| pickup_date | day_name | trips | hours_present | hours_below_10pct | first_anomalous_hour | last_anomalous_hour | is_anomalous_day |
++-------------+----------+-------+---------------+-------------------+----------------------+---------------------+------------------+
+|  2022-03-13 | Domingo  | 96285 |            23 |                 0 |                 NULL |                NULL |            false |
+|  2022-09-17 | Sábado   | 56859 |            24 |                 9 |                   15 |                  23 |             true |
+|  2022-09-18 | Domingo  |  3832 |            24 |                24 |                    0 |                  23 |             true |
++-------------+----------+-------+---------------+-------------------+----------------------+---------------------+------------------+
+
+Solo el 2022-09-17 (9 horas anómalas, de las 15:00 a las 23:00) y el
+2022-09-18 (las 24 horas) quedan marcados. El 2022-03-13 tiene 23 horas por
+el cambio al horario de verano; la franja ausente no cuenta como anómala y
+el día no se marca. El 2022-01-29 no aparece: ninguna de sus horas baja del
+10 % de su franja.
+
+--------------------------------------------------------------------------------
+T8b: desglose horario del 2022-09-16 al 2022-09-19.
+Pregunta: ¿el hueco de septiembre cubre horas completas o solo reduce el
+volumen? ¿Dónde empieza y dónde termina?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 835105224 bytes.
+
++-------------+----------------+----------------+----------------+----------------+-----------------+-----------------+
+| pickup_hour | trips_0916_vie | trips_0917_sab | trips_0918_dom | trips_0919_lun | pct_median_0917 | pct_median_0918 |
++-------------+----------------+----------------+----------------+----------------+-----------------+-----------------+
+|           0 |           3850 |           5127 |            324 |           1609 |          103.82 |            6.64 |
+|           1 |           2411 |           4214 |            298 |            767 |          105.34 |            7.49 |
+|           2 |           1432 |           3291 |            220 |            485 |          106.75 |            7.33 |
+|           3 |            816 |           2401 |            150 |            310 |          116.84 |            7.25 |
+|           4 |            610 |           1177 |             86 |            351 |          112.52 |            7.71 |
+|           5 |            848 |            613 |             40 |            884 |          110.35 |            7.01 |
+|           6 |           2363 |           1058 |             57 |           2159 |          114.25 |            6.83 |
+|           7 |           4225 |           1546 |             61 |           4023 |          106.51 |             5.0 |
+|           8 |           4881 |           2515 |             81 |           4734 |          113.39 |             4.3 |
+|           9 |           5085 |           3946 |            110 |           4789 |          112.23 |            3.78 |
+|          10 |           5403 |           5023 |            154 |           4868 |          109.61 |            3.72 |
+|          11 |           5809 |           5652 |            197 |           5104 |           102.8 |            4.11 |
+|          12 |           5907 |           6172 |            275 |           5368 |           99.71 |            5.15 |
+|          13 |           5724 |           6338 |            207 |           5591 |           99.76 |            3.82 |
+|          14 |           6586 |           5556 |            206 |           6052 |           87.97 |            3.63 |
+|          15 |           6724 |            169 |            204 |           6412 |            2.56 |            3.64 |
+|          16 |           6566 |            188 |            188 |           6512 |            2.78 |             3.3 |
+|          17 |           7526 |            247 |            181 |           7801 |             3.4 |            3.12 |
+|          18 |           8602 |            266 |            162 |           6995 |            3.66 |            2.85 |
+|          19 |           8397 |            315 |            138 |           6501 |            4.42 |            2.76 |
+|          20 |           7049 |            301 |            161 |           5849 |            4.98 |            3.58 |
+|          21 |           6743 |            204 |            132 |           5765 |            3.44 |            3.19 |
+|          22 |           6562 |            221 |             96 |           4864 |            3.61 |            2.75 |
+|          23 |           6294 |            319 |            104 |           3407 |            5.43 |            4.07 |
++-------------+----------------+----------------+----------------+----------------+-----------------+-----------------+
+
+El hueco no deja horas vacías: todas las horas tienen viajes, pero con un
+volumen muy reducido. El 2022-09-17 es normal hasta las 14:00 (87.97 % a
+99.76 % de la mediana entre las 12:00 y las 14:00) y cae al 2.56 % a las
+15:00. Desde las 15:00 del 17 hasta las 23:00 del 18 cada hora queda entre el
+2.56 % y el 7.71 % de la mediana de su franja (de 40 a 324 viajes por hora).
+El 2022-09-19 vuelve a niveles normales desde las 00:00.
+
+--------------------------------------------------------------------------------
+T8c: regla diaria descartada (50 % de la mediana del mismo día de la semana).
+Pregunta: ¿qué marcaría una regla diaria y por qué no se adopta?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 556736816 bytes.
+
++-------------+----------+-------+------------------+-------------------+-----------------------+
+| pickup_date | day_name | trips | median_dow_trips | pct_of_dow_median | flagged_by_daily_rule |
++-------------+----------+-------+------------------+-------------------+-----------------------+
+|  2022-09-18 | Domingo  |  3832 |          91865.5 |              4.17 |                  true |
+|  2022-01-29 | Sábado   | 33007 |         112868.5 |             29.24 |                  true |
+|  2022-09-17 | Sábado   | 56859 |         112868.5 |             50.38 |                 false |
+|  2022-01-01 | Sábado   | 60766 |         112868.5 |             53.84 |                 false |
++-------------+----------+-------+------------------+-------------------+-----------------------+
+
+La regla diaria marca el 2022-09-18 y el 2022-01-29 y deja fuera el
+2022-09-17 (50.38 %, justo encima del umbral). Se descarta porque mezcla los
+datos faltantes con una demanda baja real: el 2022-01-29 tiene un volumen
+bajo en todas sus horas pero ninguna hora anómala (T8a), y el 2022-09-17 tiene
+9 horas con datos faltantes (T8b).
+
+--------------------------------------------------------------------------------
+T8d: contraste con la tabla pública sin limpiar.
+Pregunta: ¿el hueco de septiembre ya existe en la fuente o lo produce la
+limpieza de trips_2022_opt?
+--------------------------------------------------------------------------------
+Dry run: 580104624 bytes (tabla pública sin particiones).
+
++-------------+-----------------+--------------+
+| pickup_date | data_file_month | source_trips |
++-------------+-----------------+--------------+
+|  2022-09-16 |               9 |       125862 |
+|  2022-09-17 |               9 |        59501 |
+|  2022-09-18 |               9 |         4229 |
+|  2022-09-19 |               9 |       105585 |
++-------------+-----------------+--------------+
+
+La tabla pública ya tiene el hueco: 59,501 viajes el 2022-09-17 y 4,229 el
+2022-09-18, frente a 125,862 el 2022-09-16 y 105,585 el 2022-09-19. Todas
+las filas vienen del archivo de septiembre (data_file_month = 9). El hueco
+está en la fuente y no lo produce la limpieza (que deja 56,859 y 3,832
+viajes en trips_2022_opt). Causa probable (hipótesis): un archivo de origen
+incompleto para esas horas.
+
+--------------------------------------------------------------------------------
 Controles de consistencia
 --------------------------------------------------------------------------------
 - T1: la suma de viajes por hora = 34,796,108 (cumple).
@@ -340,6 +469,9 @@ Controles de consistencia
 - T3: la suma de viajes por mes = 34,796,108 (cumple).
 - T6: la suma de viajes de días hábiles y fin de semana = 34,796,108 y distinct_days = 335 (cumple).
 - T7: la suma de viajes con tarjeta = 26,703,778 (cumple).
+- T5a: el top 5 de menor demanda tiene 5 filas con rangos 1 a 5 (cumple).
+- T8a: solo 2022-09-17 y 2022-09-18 con is_anomalous_day = TRUE; el
+  2022-03-13 (23 horas) no se marca (cumple).
 
 --------------------------------------------------------------------------------
 Hallazgos
@@ -388,11 +520,16 @@ Hallazgos
   (viernes, 130,333 viajes, récord absoluto del año), 2022-05-12 (jueves,
   128,042 viajes), 2022-06-09 (jueves, 127,753 viajes) y 2022-11-10 (jueves,
   127,202 viajes).
-- [T5a] El día con menor demanda registrada del año (excluyendo el corte de
-  diciembre) es el 2022-09-18 (domingo, 3,832 viajes), seguido del 2022-01-29
-  (sábado, 33,007 viajes; media móvil cae a 78,170.9), día en que Nueva York
-  fue impactada por un histórico nor'easter con intensas nevadas y parálisis
-  del transporte.
+- [T5a, T8a] El día con menor demanda registrada del año (excluyendo el día
+  parcial 2022-12-01) es el 2022-09-18 (domingo, 3,832 viajes), pero es un día
+  con datos faltantes en la fuente, igual que el 2022-09-17 desde las 15:00
+  (T8b, T8d; hipótesis: archivo de origen incompleto). El día normal de menor
+  demanda es el 2022-01-29 (sábado, 33,007 viajes; media móvil 78,170.9), sin
+  horas anómalas (hipótesis: coincide con la tormenta invernal nor'easter del
+  28 y 29 de enero de 2022; es contexto externo, no se deriva de los datos).
+- [T8a, T8c] La regla horaria (hora con menos del 10 % de la mediana de su
+  franja) marca solo el 2022-09-17 y el 2022-09-18. La regla diaria del 50 %
+  se descarta: marca el 2022-01-29 y deja fuera el 2022-09-17 (50.38 %).
 - [T5b] La media móvil de 7 días (trips_ma7) elimina eficazmente las caídas
   regulares de domingo/lunes y los picos de jueves/viernes, revelando una
   tendencia secular ascendente desde ~61k viajes/día en enero hasta un altiplano

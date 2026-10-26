@@ -198,7 +198,8 @@ A partir de las ejecuciones estructuradas en BigQuery (evidencias `07_eda_descri
 - **Días Hábiles vs. Fines de Semana:** Los días hábiles (239 días) acaparan el **73.29 % de los viajes** (promedio 106,703.1 viajes/día). Los fines de semana (96 días) abarcan el **26.71 %** (promedio 96,813.3 viajes/día).
 - **Matriz 24 × 7 y Horas Pico:** En 6 de los 7 días (lunes a sábado), la hora punta ocurre exactamente a las 18:00. El domingo es el único día cuyo pico se adelanta a las 17:00 (270,046 viajes). La franja horaria más congestionada del año es el **martes a las 18:00 (390,043 viajes, rank 1 global)**.
 - **Vida Nocturna en Fines de Semana:** Las madrugadas de sábado y domingo (00:00 a 03:00) multiplican la actividad nocturna respecto a los días laborales (sábado 00:00: 228,224 viajes vs. lunes 00:00: 78,016 viajes).
-- **Día Atípico de Enero:** El mínimo anual de demanda tuvo lugar el **sábado 2022-01-29 con solo 33,007 viajes** (hipótesis: coincide con la tormenta invernal nor'easter del 28 y 29 de enero de 2022; es contexto externo, no se deriva de los datos). En contraste, el récord máximo del año se produjo el **viernes 2022-04-01 con 130,333 viajes**.
+- **Días con Datos Faltantes en la Fuente:** El día de menor volumen del año (sin contar el día parcial 2022-12-01) es el **domingo 2022-09-18 con 3,832 viajes**, y el sábado 2022-09-17 queda incompleto desde las 15:00 (56,859 viajes). No es demanda baja: desde las 15:00 del 17 hasta las 23:00 del 18 cada hora tiene entre el 2.56 % y el 7.71 % de la mediana de su franja (día de la semana, hora), y la tabla pública ya trae solo 59,501 y 4,229 viajes esos días, todos del archivo de septiembre (T5a, T8a, T8b y T8d de `09_eda_temporal.txt`; hipótesis: archivo de origen incompleto). La regla horaria que los detecta (una hora con menos del 10 % de la mediana de su franja) marca solo esos dos días; `v_eda_tendencia_diaria` los señala con `is_anomalous_day`.
+- **Día Atípico de Enero:** El día normal de menor demanda del año es el **sábado 2022-01-29 con 33,007 viajes**, sin horas anómalas (T5a y T8a de `09_eda_temporal.txt`; hipótesis: coincide con la tormenta invernal nor'easter del 28 y 29 de enero de 2022; es contexto externo, no se deriva de los datos). En contraste, el récord máximo del año se produjo el **viernes 2022-04-01 con 130,333 viajes**.
 
 ### Eje 5: Velocidad de Circulación y Congestión Urbana
 - **Velocidad Típica:** La velocidad media general en la ciudad es de **12.11 mph** (mediana 10.38 mph; p25 7.88 mph; p75 14.20 mph).
@@ -213,9 +214,9 @@ Para alimentar de forma directa el tablero interactivo de Looker Studio construi
 
 | Vista Analítica | Filas | Costo de Consulta Completa (Dry Run) | Finalidad y Tipo de Visualización en el Tablero |
 |---|---:|---:|---|
-| `v_eda_tendencia_diaria` | 335 | 1.95 GB | Serie de tiempo diaria con `trips_ma7` y `revenue_ma7` (media móvil de 7 días). Alimenta gráficos de líneas de demanda e ingresos. |
+| `v_eda_tendencia_diaria` | 335 | 2.23 GB | Serie de tiempo diaria con `trips_ma7` y `revenue_ma7` (media móvil de 7 días), más `is_anomalous_day` (2022-09-17 y 2022-09-18, datos faltantes en la fuente) e `is_partial_day` (2022-12-01) para filtrarlos. Alimenta gráficos de líneas de demanda e ingresos. |
 | `v_eda_hora_dia` | 168 | 1.67 GB | Matriz bidimensional de 24 horas por 7 días con volumen, porcentajes y rangos. Alimenta el mapa de calor (*heatmap*) de congestión. |
-| `v_eda_zonas` | 263 | 1.45 GB | Agregaciones completas de origen y destino con nombres oficiales y boroughs de NYC. Alimenta mapas coropléticos y gráficos de barras de top zonas. |
+| `v_eda_zonas` | 263 | 1.45 GB | Una fila por `location_id` con actividad (259 con zona y 4 sin zona: 57, 105, 264 y 265), con nombres oficiales y boroughs de NYC; las zonas deduplicadas tienen una fila por `zone_id` (260 de 260, V3c en `10_vistas_eda.txt`). Alimenta mapas coropléticos y gráficos de barras de top zonas. |
 | `v_eda_pagos` | 6 | 1.50 GB | Distribución de medios de pago, tasas medianas de propina y análisis del código 0. Alimenta gráficos de torta/anillo y dispersión de tarifas. |
 
 ---
