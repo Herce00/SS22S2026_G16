@@ -53,7 +53,7 @@ Todos los datasets se crean en la ubicación `US`. Es obligatorio: la fuente est
 |---------|-------|------|---------|
 | `p2_a_trips` | A | Verde para A | `trips_2022_std`: copia derivada sin optimizar (línea base). `trips_2022_opt`: `PARTITION BY DATE(pickup_datetime)`, `CLUSTER BY pickup_location_id, dropoff_location_id`. `v_eda_*`: vistas para las gráficas exploratorias. |
 | `p2_contract` | Compartido | Amarilla | `v_trips_clean` |
-| `p2_b_ml` | B | Verde para B | `features_*`, modelos `m_*`, predicciones `pred_*`, vistas del tablero `v_dash_*` |
+| `p2_b_ml` | A (ML, ver D8) y B (tablero) | Verde para el dueño de cada objeto | `features_*`, modelos `m_*`, predicciones `pred_*`, vistas del tablero `v_dash_*` |
 
 ## Contrato: `p2_contract.v_trips_clean`
 
@@ -152,6 +152,7 @@ La fuente no tiene archivo de diciembre: `data_file_month` solo va de 1 a 11. La
 | D5 | Conservar `passenger_count` nulo | Descartar esas filas | Se perderían 1,241,840 viajes; la imputación es decisión de modelado de B. |
 | D6 | `trip_id` con `FARM_FINGERPRINT` | `ROW_NUMBER()` o `GENERATE_UUID()` | Es determinista entre ejecuciones; un split personalizado reproducible lo requiere. |
 | D7 | Specs ligeras: este steering más un documento ODD por feature | Tres archivos SDD por feature (requisitos, diseño, tareas) | El proyecto es corto; la ceremonia extra no aporta. |
+| D8 | Reasignación (2026-10-25, decisión de A, **pendiente de confirmar con B**): A construye features, los 2 modelos BQML, la evaluación y las predicciones en `p2_b_ml` (`features_*`, `m_*`, `pred_*`). B conserva el tablero de Looker Studio, la comparación "Rolling Forecast", las vistas `v_dash_*`, la sección 8.2 del README y las capturas | Que B haga todo el ML | B empieza cuando A termina; adelantar el ML con métricas reales le deja a B un tablero con datos ya verificados. B mantiene trabajo propio y visible en el historial. |
 
 ## Preguntas abiertas
 
