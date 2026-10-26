@@ -34,7 +34,7 @@ Redactar en `Proyecto_2/README.md` todas las secciones técnicas correspondiente
 
 | ID | Tarea | Ruta de ejecución | Estado |
 |----|-------|-------------------|--------|
-| T1 | Este plan | Inline: un documento | [x] Este commit |
+| T1 | Este plan | Inline: un documento | [x] `2954ed9` |
 | T2 | Redacción técnica de las secciones de Persona A en `Proyecto_2/README.md` | Writer delegado | [x] |
 
 ## Progreso y evidencia

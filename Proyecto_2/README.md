@@ -191,18 +191,18 @@ A partir de las ejecuciones estructuradas en BigQuery (evidencias `07_eda_descri
 - **JFK como Nodo Económico Crítico:** La zona de origen individual número 1 en volumen de toda Nueva York es **JFK Airport** (`location_id = 132`) con **1,651,005 viajes (4.74 % del total)** y la mayor facturación neta: **USD 101,348,368.08** (ticket promedio USD 61.39 y velocidad media 25.81 mph).
 - **Tarifa Plana Reglamentada JFK:** La tarifa JFK (`rate_code = '2.0'`, 1,288,971 viajes) demostró operar como tarifa plana fija: el **99.99 % (1,288,845 viajes) registró una tarifa base exacta de USD 52.00**, y el 98.76 % de todos los viajes de USD 52 en el año fueron viajes con tarifa JFK.
 
-### Eje 4: Dinámica Temporal, Estacionalidad y Resiliencia Climática
+### Eje 4: Dinámica Temporal, Estacionalidad y Días Atípicos
 - **Hora Punta Vespertina:** La demanda crece de forma sostenida a lo largo del día y alcanza su pico a las **18:00 (2,477,600 viajes, 7.12 % del total)**, seguido de las 17:00 (6.76 %) y 19:00 (6.43 %). El valle más pronunciado ocurre a las 04:00 (187,054 viajes, 0.54 %).
-- **Pico de Ingreso Económico:** Ocurre a las 17:00 con **USD 51,858,682.20**, superando a las 18:00 (USD 51.54M) por el impacto combinado del tráfico denso y recargos horarios.
+- **Pico de Ingreso Económico:** Ocurre a las 17:00 con **USD 51,858,682.20**, superando a las 18:00 (USD 51.54M) aunque las 18:00 tienen más viajes; el ticket promedio es mayor a las 17:00 (hipótesis: recargos horarios y trayectos más largos).
 - **Concentración Semanal en Jueves y Viernes:** El jueves acumula el mayor volumen anual (**5,327,628 viajes, 15.31 %**; USD 114.97M), mientras que el viernes registra el mayor promedio normalizado diario (**111,914.1 viajes/día**). El domingo presenta la menor actividad (4,223,302 viajes, 12.14 %).
 - **Días Hábiles vs. Fines de Semana:** Los días hábiles (239 días) acaparan el **73.29 % de los viajes** (promedio 106,703.1 viajes/día). Los fines de semana (96 días) abarcan el **26.71 %** (promedio 96,813.3 viajes/día).
 - **Matriz 24 × 7 y Horas Pico:** En 6 de los 7 días (lunes a sábado), la hora punta ocurre exactamente a las 18:00. El domingo es el único día cuyo pico se adelanta a las 17:00 (270,046 viajes). La franja horaria más congestionada del año es el **martes a las 18:00 (390,043 viajes, rank 1 global)**.
 - **Vida Nocturna en Fines de Semana:** Las madrugadas de sábado y domingo (00:00 a 03:00) multiplican la actividad nocturna respecto a los días laborales (sábado 00:00: 228,224 viajes vs. lunes 00:00: 78,016 viajes).
-- **Impacto Climático Extremo (Nor'easter de Enero):** El mínimo anual de demanda tuvo lugar el **sábado 2022-01-29 con solo 33,007 viajes**, día en que una histórica tormenta invernal paralizó Nueva York. En contraste, el récord máximo del año se produjo el **viernes 2022-04-01 con 130,333 viajes**.
+- **Día Atípico de Enero:** El mínimo anual de demanda tuvo lugar el **sábado 2022-01-29 con solo 33,007 viajes** (hipótesis: coincide con la tormenta invernal nor'easter del 28 y 29 de enero de 2022; es contexto externo, no se deriva de los datos). En contraste, el récord máximo del año se produjo el **viernes 2022-04-01 con 130,333 viajes**.
 
 ### Eje 5: Velocidad de Circulación y Congestión Urbana
 - **Velocidad Típica:** La velocidad media general en la ciudad es de **12.11 mph** (mediana 10.38 mph; p25 7.88 mph; p75 14.20 mph).
-- **Inversión Horaria de Velocidad:** La velocidad media se desploma a **10.32 mph a las 16:00** debido al colapso del tráfico, pero se duplica en la madrugada, alcanzando **21.38 mph a las 05:00**.
+- **Inversión Horaria de Velocidad:** La velocidad media se desploma a **10.32 mph a las 16:00** (hipótesis: congestión de la hora pico), pero se duplica en la madrugada, alcanzando **21.38 mph a las 05:00**.
 - **Mayor Fluidez en Fin de Semana:** Los fines de semana la velocidad media es un **14.1 % más rápida (13.32 mph vs. 11.67 mph en días hábiles)**. Esta mayor fluidez permite que los viajes de fin de semana recorran trayectos más largos (3.71 mi vs. 3.50 mi) en menor tiempo promedio (14.88 min vs. 16.12 min).
 
 ---
