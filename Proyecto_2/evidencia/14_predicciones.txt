@@ -1,0 +1,382 @@
+================================================================================
+14_predicciones.txt
+Evidencia de T5 (feature p2-a-bqml): predicciones de BigQuery ML sobre los
+nuevos registros (noviembre) y comparación agregada de real frente a predicho.
+Script: Proyecto_2/sql/b_04_predicciones.sql
+Fuentes: ss2-g16-proyecto2.p2_b_ml.features_trips (b_01_features.sql), los
+         modelos m_fare_linreg (M-1), m_fare_linreg_gd (M-2) y m_tip_logreg
+         (M-3) de b_02_modelos.sql, y p2_contract.v_trips_clean (solo
+         trip_id y pickup_date).
+Salidas: ss2-g16-proyecto2.p2_b_ml.pred_fare_nov,
+         ss2-g16-proyecto2.p2_b_ml.pred_tip_nov y
+         ss2-g16-proyecto2.p2_b_ml.v_ml_pred_diaria.
+Proyecto: ss2-g16-proyecto2 (ubicación US). Fecha de ejecución: 2026-10-25.
+================================================================================
+
+--------------------------------------------------------------------------------
+Método
+--------------------------------------------------------------------------------
+- Cada bloque se extrajo de su etiqueta [P1] a [P5b] del script a un archivo
+  propio, así que el texto ejecutado coincide byte a byte con el bloque.
+  Después de la última edición del script se volvió a extraer cada bloque y
+  se comparó con el archivo ejecutado (cmp): los 10 coinciden.
+- Cada bloque se ejecutó primero con --dry_run y luego real, con
+  --format=pretty. Se quitaron las líneas "Waiting on bqjob". El dry run de
+  P5b se hizo después de crear la vista (P5), porque antes la vista no
+  existe.
+- Ningún bloque supera el límite de 10 GB; el mayor (P1) estima una cota
+  superior de 262,546,635 bytes. La suma de los 10 dry runs es 565,482,592
+  bytes.
+- Conjunto de predicción: split_set = 'new' (noviembre, 222,890 filas, de
+  las que 172,626 tienen tarjeta), que ningún modelo usó al entrenar ni al
+  evaluar internamente (12_modelos.txt). Incluye las filas del 2022-12-01,
+  que vienen en el archivo de noviembre.
+- Corrección durante la ejecución: P4c se agregó después de ver P4a y P4b,
+  para medir el efecto de las predicciones extremas de M-1 en los totales
+  diarios en lugar de suponerlo.
+
+--------------------------------------------------------------------------------
+P1: predicciones de tarifa de M-1 y M-2 sobre noviembre.
+Pregunta: ¿qué tarifa predice cada modelo de regresión para cada viaje de los
+nuevos registros, y con qué error absoluto?
+--------------------------------------------------------------------------------
+Dry run: cota superior de 262546635 bytes.
+
+Created ss2-g16-proyecto2.p2_b_ml.pred_fare_nov
+
+Columnas: trip_id, pickup_date, pickup_hour (INT64), pickup_borough,
+trip_distance, fare_actual, pred_fare_m1, pred_fare_m2, abs_err_m1 y
+abs_err_m2. El dry run da una cota superior porque incluye ML.PREDICT. Filas
+y nulos en P3a.
+
+--------------------------------------------------------------------------------
+P2: predicciones de propina alta de M-3 sobre noviembre.
+Pregunta: ¿qué probabilidad de propina alta asigna la logística a cada viaje
+con tarjeta de los nuevos registros?
+--------------------------------------------------------------------------------
+Dry run: cota superior de 244569732 bytes.
+
+Created ss2-g16-proyecto2.p2_b_ml.pred_tip_nov
+
+Columnas: trip_id, pickup_date, pickup_hour (INT64), pickup_borough,
+is_high_tip_actual, prob_high_tip (probabilidad de la clase TRUE) y
+pred_is_high_tip. Filas y nulos en P3a.
+
+--------------------------------------------------------------------------------
+P3a: filas, nulos y rango de fechas de las tablas de predicción.
+Pregunta: ¿las tablas cubren todo el split 'new' sin perder filas en los
+joins y sin predicciones nulas?
+--------------------------------------------------------------------------------
+Dry run: 11448130 bytes.
+
++---------------+--------+------------+------------------+------------+------------+------------+-----------------+
+|  table_name   | n_rows | n_trip_ids | null_predictions | null_dates |  min_date  |  max_date  | rows_2022_12_01 |
++---------------+--------+------------+------------------+------------+------------+------------+-----------------+
+| pred_fare_nov | 222890 |     222890 |                0 |          0 | 2022-11-01 | 2022-12-01 |               1 |
+| pred_tip_nov  | 172626 |     172626 |                0 |          0 | 2022-11-01 | 2022-12-01 |               1 |
++---------------+--------+------------+------------------+------------+------------+------------+-----------------+
+
+Cumple: pred_fare_nov tiene 222,890 filas (split 'new' de V1 en
+11_features.txt) y pred_tip_nov 172,626 (card_rows de 'new' en V6). trip_id
+es único en las dos tablas, así que los joins con M-2 y con v_trips_clean no
+perdieron ni duplicaron filas. 0 predicciones nulas y 0 fechas nulas. Las
+fechas van del 2022-11-01 al 2022-12-01. Del 2022-12-01 queda 1 sola fila
+en la muestra (de los 57 viajes de ese día en el contrato), y esa fila tiene
+tarjeta.
+
+--------------------------------------------------------------------------------
+P3b: RMSE, MAE y R² recalculados desde pred_fare_nov.
+Pregunta: ¿las predicciones guardadas reproducen las métricas de noviembre de
+T4?
+--------------------------------------------------------------------------------
+Dry run: 8915600 bytes.
+
++------------------+--------+--------------------+--------------------+---------------------+
+|      model       | n_rows |        rmse        |        mae         |         r2          |
++------------------+--------+--------------------+--------------------+---------------------+
+| m_fare_linreg    | 222890 | 15.273026726491066 |  2.041074766290587 | -0.2994820320454996 |
+| m_fare_linreg_gd | 222890 | 4.2362681069723225 | 2.5458012257707656 |  0.9000260315498967 |
++------------------+--------+--------------------+--------------------+---------------------+
+
+Cumple: las métricas recalculadas desde la tabla coinciden con E5a de
+13_evaluacion.txt (ML.EVALUATE sobre noviembre) hasta el decimal 12 o más.
+M-1: RMSE 15.27303 frente a 15.27303, MAE 2.04107 frente a 2.04107 y R²
+-0.29948 frente a -0.29948. M-2: RMSE 4.23627 frente a 4.23627, MAE 2.54580
+frente a 2.54580 y R² 0.90003 frente a 0.90003.
+
+--------------------------------------------------------------------------------
+P3c: exactitud, precisión y recall recalculados desde pred_tip_nov.
+Pregunta: ¿la clase guardada reproduce las métricas de noviembre de T4, y
+corresponde al umbral 0.5 sobre prob_high_tip?
+--------------------------------------------------------------------------------
+Dry run: 1726260 bytes.
+
++--------+--------------------+--------------------+--------------------+----------------------+----------------------+-------------------+--------------------+--------------------+
+| n_rows |      accuracy      |     precision      |       recall       | threshold_mismatches |       min_prob       |     max_prob      |      avg_prob      |    actual_rate     |
++--------+--------------------+--------------------+--------------------+----------------------+----------------------+-------------------+--------------------+--------------------+
+| 172626 | 0.6674834613557633 | 0.6553124956374855 | 0.9213075179337212 |                    0 | 8.490664045942405E-4 | 0.820865619635242 | 0.6180090714666162 | 0.5903108454114676 |
++--------+--------------------+--------------------+--------------------+----------------------+----------------------+-------------------+--------------------+--------------------+
+
+Cumple: exactitud 0.6674834613557633, precisión 0.6553124956374855 y recall
+0.9213075179337212, idénticas a la fila 'new' de E5b y E7b en
+13_evaluacion.txt. threshold_mismatches = 0: pred_is_high_tip es TRUE
+exactamente cuando prob_high_tip >= 0.5. actual_rate (0.5903) coincide con
+la exactitud del baseline de clase mayoritaria de noviembre (E7b). La
+probabilidad máxima de noviembre es 0.821 (0.828 en octubre, E4c) y la
+media es 0.618.
+
+--------------------------------------------------------------------------------
+P4a: resumen diario de noviembre, tarifa real frente a predicha.
+Pregunta: ¿cuánto se acercan las tarifas predichas por M-1 y M-2 al total
+real de cada día?
+--------------------------------------------------------------------------------
+Dry run: 10698720 bytes.
+
++-------------+----------------+-------+-------------------+--------------------+--------------------+-------------+-------------+--------+--------+-----------------+------------------+
+| pickup_date | is_partial_day | trips | fare_actual_total | fare_pred_m1_total | fare_pred_m2_total | pct_diff_m1 | pct_diff_m2 | mae_m1 | mae_m2 | fare_actual_ma7 | fare_pred_m2_ma7 |
++-------------+----------------+-------+-------------------+--------------------+--------------------+-------------+-------------+--------+--------+-----------------+------------------+
+|  2022-11-01 |          false |  8072 |         120979.95 |          118057.35 |          117156.28 |       -2.42 |       -3.16 |  1.983 |   2.52 |       120979.95 |        117156.28 |
+|  2022-11-02 |          false |  8737 |          132578.2 |          128565.48 |          127469.33 |       -3.03 |       -3.85 |  2.044 |  2.607 |       126779.07 |        122312.81 |
+|  2022-11-03 |          false |  9167 |         139362.94 |          138791.41 |          134300.91 |       -0.41 |       -3.63 |  2.435 |  2.599 |        130973.7 |        126308.84 |
+|  2022-11-04 |          false |  8867 |         132768.78 |          129045.32 |          128346.08 |        -2.8 |       -3.33 |  1.952 |  2.518 |       131422.47 |        126818.15 |
+|  2022-11-05 |          false |  8765 |         126638.86 |          120107.51 |          119245.67 |       -5.16 |       -5.84 |  2.052 |  2.644 |       130465.75 |        125303.66 |
+|  2022-11-06 |          false |  7145 |         111406.28 |          109466.51 |           108915.8 |       -1.74 |       -2.24 |  1.809 |  2.381 |       127289.17 |        122572.35 |
+|  2022-11-07 |          false |  7622 |         118546.95 |          114700.81 |          113868.29 |       -3.24 |       -3.95 |  1.793 |  2.344 |       126040.28 |        121328.91 |
+|  2022-11-08 |          false |  8371 |         119843.36 |          118483.22 |          117681.77 |       -1.13 |        -1.8 |  1.802 |  2.317 |       125877.91 |        121403.98 |
+|  2022-11-09 |          false |  8800 |          131155.4 |          126204.62 |          125348.53 |       -3.77 |       -4.43 |  2.096 |  2.621 |       125674.65 |        121101.01 |
+|  2022-11-10 |          false |  9147 |         141907.26 |          134563.83 |          133469.54 |       -5.17 |       -5.95 |  2.235 |  2.802 |       126038.13 |        120982.24 |
+|  2022-11-11 |          false |  8121 |         128659.18 |          121200.26 |           120495.9 |        -5.8 |       -6.34 |  2.469 |   3.04 |       125451.04 |        119860.79 |
+|  2022-11-12 |          false |  8916 |         129338.54 |          122032.71 |          122781.45 |       -5.65 |       -5.07 |  2.143 |   2.54 |       125836.71 |         120365.9 |
+|  2022-11-13 |          false |  7794 |          123472.0 |          120706.86 |          120259.49 |       -2.24 |        -2.6 |   1.77 |  2.331 |       127560.38 |        121986.42 |
+|  2022-11-14 |          false |  5661 |           88537.6 |           84669.72 |           84246.49 |       -4.37 |       -4.85 |  1.905 |  2.452 |       123273.33 |        117754.74 |
+|  2022-11-15 |          false |  6371 |          98487.38 |           93699.49 |            93369.1 |       -4.86 |        -5.2 |   2.17 |  2.741 |       120222.48 |         114281.5 |
+|  2022-11-16 |          false |  6412 |           96898.5 |           92880.01 |           92488.61 |       -4.15 |       -4.55 |  2.154 |  2.755 |       115328.64 |        109587.23 |
+|  2022-11-17 |          false |  6590 |         103974.13 |           99507.56 |           98961.14 |        -4.3 |       -4.82 |  2.214 |  2.794 |       109909.62 |        104657.46 |
+|  2022-11-18 |          false |  6642 |          99144.48 |           95679.65 |           95397.41 |       -3.49 |       -3.78 |  1.966 |  2.534 |       105693.23 |        101071.96 |
+|  2022-11-19 |          false |  6739 |         100815.75 |           96440.12 |           95689.16 |       -4.34 |       -5.09 |  2.081 |  2.685 |       101618.55 |         97201.63 |
+|  2022-11-20 |          false |  5693 |          89100.15 |            87326.9 |           86893.87 |       -1.99 |       -2.48 |  1.702 |  2.307 |        96708.28 |         92435.11 |
+|  2022-11-21 |          false |  7418 |         108787.67 |          103399.63 |          102996.31 |       -4.95 |       -5.32 |  1.931 |  2.467 |        99601.15 |         95113.66 |
+|  2022-11-22 |          false |  7849 |         119049.52 |           114212.5 |          113500.07 |       -4.06 |       -4.66 |  2.048 |  2.605 |        102538.6 |         97989.51 |
+|  2022-11-23 |          false |  7146 |         104047.18 |          103420.95 |          103061.87 |        -0.6 |       -0.95 |   1.95 |   2.48 |       103559.84 |         99499.98 |
+|  2022-11-24 |          false |  4771 |          68535.99 |           72807.25 |           72095.97 |        6.23 |        5.19 |  2.058 |  2.522 |        98497.25 |         95662.09 |
+|  2022-11-25 |          false |  5902 |          83486.26 |           87506.19 |           87064.77 |        4.82 |        4.29 |   1.83 |  2.307 |        96260.36 |         94471.72 |
+|  2022-11-26 |          false |  6854 |         102868.52 |          102493.02 |          101721.68 |       -0.37 |       -1.11 |  1.841 |  2.356 |        96553.61 |         95333.51 |
+|  2022-11-27 |          false |  6105 |          97496.59 |           97595.91 |           97542.01 |         0.1 |        0.05 |  1.611 |  2.189 |         97753.1 |         96854.67 |
+|  2022-11-28 |          false |  7298 |         116908.85 |          115344.99 |          114671.31 |       -1.34 |       -1.91 |  1.678 |  2.248 |        98913.27 |         98522.53 |
+|  2022-11-29 |          false |  8084 |          120776.3 |          118326.23 |           118069.5 |       -2.03 |       -2.24 |  1.936 |  2.476 |        99159.96 |          99175.3 |
+|  2022-11-30 |          false |  7830 |         121275.92 |          120890.83 |           114526.6 |       -0.32 |       -5.57 |  3.176 |  2.937 |        101621.2 |        100813.12 |
+|  2022-12-01 |           true |     1 |               8.5 |               8.83 |               9.14 |        3.89 |        7.55 |  0.331 |  0.642 |        91831.56 |          90515.0 |
++-------------+----------------+-------+-------------------+--------------------+--------------------+-------------+-------------+--------+--------+-----------------+------------------+
+
+31 filas: los 30 días de noviembre y el 2022-12-01. trips suma 222,890
+(P5b, cumple). La fila del 2022-12-01 es PARCIAL (is_partial_day = TRUE): es
+1 solo viaje de la muestra, que viene en el archivo de noviembre. Sus totales
+no se comparan con un día completo, y su media móvil (91,831.56 real y
+90,515.00 de M-2) mezcla 6 días completos con ese día de 1 viaje; el tablero
+debe filtrarla con is_partial_day.
+Lectura de los 30 días completos (cálculos propios sobre la tabla):
+- M-2 subestima el total diario en 27 de 30 días. Su diferencia va de -6.34 %
+  (2022-11-11) a +5.19 % (2022-11-24), con un promedio de -3.17 %. M-1 queda
+  en un promedio de -2.42 % y también subestima en 27 de 30 días.
+- Los 3 días en que los dos modelos sobrestiman son el 2022-11-24, el
+  2022-11-25 y el 2022-11-27. El 2022-11-24 es el día con menos viajes del mes
+  (4,771) y coincide con el feriado de Acción de Gracias (Thanksgiving) de
+  2022 (contexto externo, no se deriva de los datos); que el feriado cambie la
+  mezcla de viajes es una hipótesis.
+- Una subestimación sistemática de 2 a 6 % es compatible con un nivel de
+  tarifa más alto en noviembre que en ene-sep, el periodo de entrenamiento
+  (tarifa promedio 15.15 en 'new' frente a 14.46 en 'train', V4 de
+  11_features.txt); que esa sea la causa es una hipótesis.
+- La media móvil de 7 días del real y la de M-2 siguen la misma forma: bajan
+  de unos 131,000 a cerca de 96,000 en la segunda mitad del mes y suben al
+  final. La brecha entre las dos llega a 5,940.98 en el peor caso
+  (2022-11-15) y casi desaparece al final del mes (2022-11-29: 99,159.96 real
+  frente a 99,175.30 de M-2).
+- El 2022-11-30 es el día con el mayor MAE de M-1 (3.176) y el segundo mayor
+  de M-2 (2.937, después del 3.04 del 2022-11-11). En M-1 una sola fila con
+  error de 5,837.20 aporta 5,837.20 / 7,830 = 0.745 a ese MAE (P4c).
+
+--------------------------------------------------------------------------------
+P4b: resumen de noviembre por borough de origen.
+Pregunta: ¿el ajuste de los modelos cambia según el borough donde empieza el
+viaje?
+--------------------------------------------------------------------------------
+Dry run: 11312555 bytes.
+
++----------------+--------+-------------------+--------------------+--------------------+-------------+-------------+---------+--------+----------+---------+
+| pickup_borough | trips  | fare_actual_total | fare_pred_m1_total | fare_pred_m2_total | pct_diff_m1 | pct_diff_m2 | mae_m1  | mae_m2 | rmse_m1  | rmse_m2 |
++----------------+--------+-------------------+--------------------+--------------------+-------------+-------------+---------+--------+----------+---------+
+| Manhattan      | 198027 |        2453819.56 |         2367158.14 |         2339033.47 |       -3.53 |       -4.68 |   1.787 |  2.306 |     3.08 |   3.533 |
+| Queens         |  19840 |         797713.48 |          790026.32 |          800123.19 |       -0.96 |         0.3 |   3.587 |  4.222 |   13.143 |   7.337 |
+| Desconocido    |   3436 |          87420.21 |           84073.83 |           85089.23 |       -3.83 |       -2.67 |   3.992 |  4.992 |    8.437 |   8.793 |
+| Brooklyn       |   1365 |          30838.88 |           30869.36 |           30664.46 |         0.1 |       -0.57 |   4.075 |  6.016 |   10.146 |  10.776 |
+| Bronx          |    200 |           5311.95 |            8583.24 |            5210.67 |       61.58 |       -1.91 |   21.89 |  5.977 |  247.077 |   8.722 |
+| EWR            |     11 |            1172.0 |              940.1 |             918.31 |      -19.79 |      -21.65 |   25.51 | 25.388 |   39.461 |  40.266 |
+| Staten Island  |     11 |            580.91 |            6484.68 |             604.74 |      1016.3 |         4.1 | 540.303 | 11.237 | 1760.038 |    15.3 |
++----------------+--------+-------------------+--------------------+--------------------+-------------+-------------+---------+--------+----------+---------+
+
+trips suma 222,890 (cumple). Manhattan tiene 198,027 viajes, el 88.85 % de
+noviembre. Las sumas de las tres columnas de totales coinciden con P5b
+(3,376,856.99 real, 3,288,135.67 de M-1 y 3,261,644.07 de M-2; la última
+difiere en 0.02 de P5b por el redondeo por fila).
+- Las predicciones extremas de M-1 dominan dos boroughs con pocos viajes.
+  Staten Island (11 viajes): M-1 predice 6,484.68 frente a 580.91 reales
+  (+1,016.3 %); la fila de 5,854.20 de E6d (zona 214, 0 filas en 'train')
+  explica 5,837.20 de esa diferencia de 5,903.77. Bronx (200 viajes): M-1
+  predice +61.58 %; la fila de 3,516.81 de E6d (zona 59) aporta 3,492.15 de
+  la diferencia de 3,271.29, así que el resto de las filas del Bronx
+  compensa en parte. En Queens, el RMSE de M-1 (13.143) casi duplica el de
+  M-2 (7.337), por la fila de -1,545.89 de E6d (zona 2). M-2 queda entre
+  -1.91 % y +4.1 % en esos tres boroughs.
+- En Manhattan, Desconocido, Brooklyn y EWR, M-1 tiene menor RMSE que M-2, y
+  menor MAE en todos salvo EWR (25.51 frente a 25.388).
+- EWR (11 viajes) es el único borough donde los dos modelos fallan por igual:
+  subestiman cerca de 20 % (-19.79 % y -21.65 %). Con 11 viajes, la cifra es
+  poco estable.
+
+--------------------------------------------------------------------------------
+P4c: efecto de las predicciones extremas de M-1 en los totales diarios.
+Pregunta: ¿en qué días caen las filas de M-1 con error absoluto mayor de
+USD 100 y cuánto mueven el total predicho de ese día?
+--------------------------------------------------------------------------------
+Dry run: 7132480 bytes.
+
++-------------+------------------+---------------+----------------+-------------+---------------------+
+| pickup_date | n_abs_err_gt_100 | signed_err_m1 | max_abs_err_m1 | pct_diff_m1 | pct_diff_m1_without |
++-------------+------------------+---------------+----------------+-------------+---------------------+
+|  2022-11-01 |                1 |        106.14 |         106.14 |       -2.42 |               -2.51 |
+|  2022-11-02 |                2 |       -230.04 |         126.28 |       -3.03 |               -2.86 |
+|  2022-11-03 |                1 |       3492.15 |        3492.15 |       -0.41 |               -2.92 |
+|  2022-11-04 |                1 |       -118.69 |         118.69 |        -2.8 |               -2.72 |
+|  2022-11-05 |                1 |       -116.73 |         116.73 |       -5.16 |               -5.08 |
+|  2022-11-10 |                2 |        -214.4 |         109.76 |       -5.17 |               -5.04 |
+|  2022-11-12 |                1 |      -1570.89 |        1570.89 |       -5.65 |               -4.43 |
+|  2022-11-17 |                1 |        -124.7 |          124.7 |        -4.3 |               -4.19 |
+|  2022-11-19 |                1 |       -134.74 |         134.74 |       -4.34 |               -4.22 |
+|  2022-11-21 |                1 |       -132.99 |         132.99 |       -4.95 |               -4.84 |
+|  2022-11-24 |                1 |       -251.67 |         251.67 |        6.23 |                6.63 |
+|  2022-11-30 |                1 |        5837.2 |         5837.2 |       -0.32 |               -5.13 |
++-------------+------------------+---------------+----------------+-------------+---------------------+
+
+Cumple: n_abs_err_gt_100 suma 14 en los 12 días, igual que E6e de
+13_evaluacion.txt para M-1 en noviembre. Efecto real en los totales
+diarios:
+- Tres filas mueven el total de su día de forma visible. 2022-11-03: +3,492.15
+  (la fila de zona 59 del Bronx), y la diferencia de M-1 pasa de -2.92 % sin
+  ella a -0.41 % con ella. 2022-11-30: +5,837.20 (zona 214 de Staten Island),
+  de -5.13 % a -0.32 %. 2022-11-12: -1,570.89 (zona 2 de Queens), de -4.43 % a
+  -5.65 %.
+- En 2022-11-03 y 2022-11-30 una sola predicción absurda compensa la
+  subestimación general de M-1, y su total diario parece mucho más exacto que
+  el de M-2 (-0.32 % frente a -5.57 % el 2022-11-30). Es una coincidencia de
+  signos, no una mejor predicción: el MAE de M-1 ese día es el más alto del
+  mes (P4a).
+- Las otras 11 filas tienen errores de entre 100 y 252 y mueven la
+  diferencia de su día 0.40 puntos como máximo (2022-11-24: 6.23 % frente a
+  6.63 %).
+- En el mes, el error neto de las 14 filas es +6,540.64 (suma de
+  signed_err_m1), el 0.19 % del total real de noviembre (3,376,856.99, P5b).
+  Si esas filas tuvieran predicción igual a la tarifa real, M-1 quedaría en
+  -2.82 % en el mes en lugar de -2.63 % (cálculo propio).
+
+--------------------------------------------------------------------------------
+P5: vista diaria v_ml_pred_diaria para el tablero.
+Pregunta: ¿qué objeto conecta B en Looker Studio para la serie diaria de real
+frente a predicho?
+--------------------------------------------------------------------------------
+Dry run: 0 bytes.
+
+Created ss2-g16-proyecto2.p2_b_ml.v_ml_pred_diaria
+
+La vista tiene el mismo cuerpo que P4a, sin ORDER BY. Usa el prefijo v_ml_
+porque la publica el trabajo de ML (D8); v_dash_* queda para las vistas del
+tablero, que son de B. Crear una vista no procesa bytes.
+
+--------------------------------------------------------------------------------
+P5b: control de la vista contra P4a.
+Pregunta: ¿la vista devuelve la misma serie que la consulta de P4a?
+--------------------------------------------------------------------------------
+Dry run: 7132480 bytes.
+
++--------+----------------+--------+-------------------+--------------------+--------------------+
+| n_days | n_partial_days | trips  | fare_actual_total | fare_pred_m1_total | fare_pred_m2_total |
++--------+----------------+--------+-------------------+--------------------+--------------------+
+|     31 |              1 | 222890 |        3376856.99 |         3288135.67 |         3261644.05 |
++--------+----------------+--------+-------------------+--------------------+--------------------+
+
+Cumple: 31 filas, 1 día parcial y 222,890 viajes. Los tres totales son
+iguales a la suma de las columnas de P4a (3,376,856.99, 3,288,135.67 y
+3,261,644.05, sumadas a mano sobre la salida de P4a). En el mes, M-1
+predice un total 2.63 % menor que el real y M-2 un 3.41 % menor (cálculo
+propio sobre estos totales).
+
+--------------------------------------------------------------------------------
+Tabla resumen
+--------------------------------------------------------------------------------
+Noviembre, split 'new' (222,890 viajes; 172,626 con tarjeta):
+
+  | Medida                                   | M-1 (m_fare_linreg) | M-2 (m_fare_linreg_gd) |
+  |------------------------------------------|---------------------|------------------------|
+  | RMSE (P3b)                               | 15.27               | 4.24                   |
+  | MAE (P3b)                                | 2.04                | 2.55                   |
+  | R² (P3b)                                 | -0.299              | 0.900                  |
+  | Total predicho / real del mes (P5b)      | -2.63 %             | -3.41 %                |
+  | Rango de diferencia diaria, 30 días (P4a)| -5.80 % a +6.23 %   | -6.34 % a +5.19 %      |
+  | Días con MAE diario menor (P4a)          | 29 de 30            | 1 de 30 (2022-11-30)   |
+  | Peor borough (P4b)                       | Staten Island,      | EWR, -21.65 %          |
+  |                                          | +1,016.3 %          |                        |
+
+  | Medida (m_tip_logreg, umbral 0.5, P3c) | Valor  |
+  |----------------------------------------|--------|
+  | Exactitud                              | 0.667  |
+  | Precisión                              | 0.655  |
+  | Recall                                 | 0.921  |
+  | Probabilidad máxima                    | 0.821  |
+  | Proporción real de propina alta        | 0.590  |
+
+--------------------------------------------------------------------------------
+Controles de consistencia
+--------------------------------------------------------------------------------
+- P3a: pred_fare_nov tiene 222,890 filas = split 'new' de V1 en
+  11_features.txt, y pred_tip_nov 172,626 = card_rows de 'new' en V6
+  (cumple). trip_id único y 0 nulos en predicciones y fechas (cumple).
+- P3b frente a E5a de 13_evaluacion.txt: RMSE, MAE y R² de M-1 y M-2 iguales
+  hasta el decimal 12 o más (cumple).
+- P3c frente a E5b y E7b: exactitud, precisión y recall idénticas (cumple);
+  la clase guardada corresponde al umbral 0.5 (0 diferencias, cumple).
+- P4a, P4b y P5b: trips suma 222,890 en los tres (cumple), y los totales de
+  P4a y P4b suman lo mismo que P5b (cumple, salvo 0.02 de redondeo en P4b).
+- P4c: 14 filas con error mayor de 100 = E6e (cumple).
+- Ningún dry run supera 10 GB (cumple).
+
+--------------------------------------------------------------------------------
+Conclusiones
+--------------------------------------------------------------------------------
+- Las tablas pred_fare_nov y pred_tip_nov cubren todo noviembre (y el
+  2022-12-01, 1 viaje de la muestra) y reproducen exactamente las métricas
+  de T4, así que el tablero de B puede usarlas como fuente verificada.
+- M-2, el modelo seleccionado, sigue el total diario real de cerca: en los
+  30 días completos su diferencia va de -6.34 % a +5.19 % y en el mes es de
+  -3.41 %. Subestima en 27 de 30 días. Una causa compatible es que la tarifa
+  promedio de noviembre (15.15) es mayor que la de ene-sep (14.46, V4 de
+  11_features.txt) (hipótesis). Los días en que sobrestima incluyen el feriado
+  de Acción de Gracias (2022-11-24) y el día siguiente (hipótesis: cambia la
+  mezcla de viajes).
+- Las predicciones extremas de M-1 sí distorsionan sus totales, pero solo en
+  agregados chicos. En el día, tres filas mueven el total entre 1.2 y 4.8
+  puntos (2022-11-03, 2022-11-12 y 2022-11-30), y en dos de esos días lo
+  acercan al real por una coincidencia de signos. Por borough, Staten Island
+  (+1,016.3 %) y el Bronx (+61.58 %) quedan dominados por una sola fila cada
+  uno. En el total del mes el efecto neto es pequeño (+6,540.64, 0.19 % del
+  real), y M-1 tiene menor MAE diario que M-2 en 29 de 30 días.
+- Por eso un total de M-1 que parece exacto no prueba que el modelo sea
+  bueno: la decisión de T4 se mantiene. M-2 es la serie principal del
+  tablero y M-1 queda como comparación.
+- M-3 mantiene en noviembre el rango estrecho de probabilidades de octubre
+  (máximo 0.821). pred_tip_nov permite mostrar la tasa de propina alta real
+  frente a la predicha por hora o borough.
+- Para B: v_ml_pred_diaria es la serie diaria de real frente a predicho, la
+  base de datos para la comparación "(Rolling Forecast)" del tablero. Cómo
+  define el curso el "Rolling Forecast" sigue abierto (Q1 del steering); B
+  decide la visualización final. El día 2022-12-01 se filtra con
+  is_partial_day.
