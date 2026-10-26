@@ -34,6 +34,7 @@ cmd //c "set PYTHONUTF8=1&& bq --project_id=ss2-g16-proyecto2 query --use_legacy
 
 - `PYTHONUTF8=1` es obligatorio: sin esa variable, `bq` lee el archivo como cp1252 y los textos con tildes quedan corruptos (por ejemplo, «común» se guarda como «comÃºn»).
 - La ruta del redireccionamiento usa `\` porque la interpreta `cmd`.
+- **Nunca pasar SQL inline dentro de `cmd //c "..."`**: `cmd` interpreta `>`, `<` y `|` del SQL como redirecciones y crea archivos vacíos en la raíz del repo (pasó con `1` y con `TIMESTAMP_SUB(CURRENT_TIMESTAMP()`). El SQL siempre va en un archivo bajo `$TEMP` y entra por `<`.
 - Se usa la configuración de gcloud `ss2-p2`.
 
 ## Control de costos
