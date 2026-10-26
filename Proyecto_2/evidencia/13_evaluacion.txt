@@ -1,0 +1,448 @@
+================================================================================
+13_evaluacion.txt
+Evidencia de T4 (feature p2-a-bqml): evaluación de los modelos de BigQuery ML
+sobre datos de retención.
+Script: Proyecto_2/sql/b_03_evaluacion.sql
+Fuentes: ss2-g16-proyecto2.p2_b_ml.features_trips (b_01_features.sql) y los
+         modelos m_fare_linreg (M-1), m_fare_linreg_gd (M-2) y m_tip_logreg
+         (M-3) de b_02_modelos.sql (12_modelos.txt).
+Salidas: solo resultados de consulta; no se crean tablas.
+Proyecto: ss2-g16-proyecto2 (ubicación US). Fecha de ejecución: 2026-10-25.
+================================================================================
+
+--------------------------------------------------------------------------------
+Método
+--------------------------------------------------------------------------------
+- Cada bloque se extrajo de su etiqueta [E1] a [E7b] del script a un archivo
+  propio, así que el texto ejecutado coincide byte a byte con el bloque.
+  Después de la última edición del script se volvió a extraer cada bloque y
+  se comparó con el archivo ejecutado (cmp): los 15 coinciden.
+- Cada bloque se ejecutó primero con --dry_run y luego real, con
+  --format=pretty. Se quitaron las líneas "Waiting on bqjob".
+- Ningún bloque supera el límite de 10 GB; el mayor (E6d) estima
+  212,641,195 bytes. La suma de los 15 dry runs es 2,197,915,615 bytes.
+- Conjuntos evaluados: octubre (split_set = 'eval', 250,744 filas; 194,093
+  con tarjeta) y noviembre (split_set = 'new', 222,890 filas, incluye las del
+  2022-12-01; 172,626 con tarjeta). Octubre no ajustó pesos en ningún modelo;
+  en M-3 sí definió eval_loss y el corte por early_stop (12_modelos.txt), por
+  eso se repite todo sobre noviembre.
+- RMSE = SQRT(mean_squared_error). En los cálculos a mano, R² = 1 - SSE /
+  SST, con SST respecto de la media del propio conjunto; coincide con el
+  r2_score de ML.EVALUATE (E7a frente a E1 y E5a).
+- Corrección durante la ejecución: la primera versión de E4b usaba
+  GENERATE_ARRAY(0.1, 0.9, 0.1) y devolvió 8 umbrales. Se cambió a un
+  arreglo literal de 0.1 a 0.9. Siguió devolviendo 8: el umbral 0.9 no
+  aparece porque ninguna probabilidad llega a 0.9 (E4c). Se agregaron E4c,
+  E6d y E6e como diagnósticos.
+
+--------------------------------------------------------------------------------
+E1: métricas de regresión de M-1 y M-2 sobre octubre.
+Pregunta: ¿qué tan bien predicen la tarifa los dos modelos lineales en un mes
+que no usaron para ajustar pesos?
+--------------------------------------------------------------------------------
+Dry run: 192781043 bytes.
+
++------------------+-----------+--------------------+--------------------+--------------------+-----------------------+--------------------+--------------------+
+|      model       | eval_rows |        mae         |        mse         |        rmse        | median_absolute_error |      r2_score      | explained_variance |
++------------------+-----------+--------------------+--------------------+--------------------+-----------------------+--------------------+--------------------+
+| m_fare_linreg    |    250744 | 2.0071852706879074 |  15.47822118268432 | 3.9342370521721644 |    1.2629784379164448 |  0.915348279963346 | 0.9164997686857318 |
+| m_fare_linreg_gd |    250744 |  2.559188240125085 | 18.623661290899598 | 4.3155140239488965 |    1.7410846241643156 | 0.8981455980601707 | 0.8997794970587967 |
++------------------+-----------+--------------------+--------------------+--------------------+-----------------------+--------------------+--------------------+
+
+eval_rows = 250,744 = split 'eval' de V1 en 11_features.txt (cumple). En
+octubre M-1 rinde mejor que M-2 en todas las métricas: RMSE 3.93 frente a
+4.32, MAE 2.01 frente a 2.56, mediana del error absoluto 1.26 frente a 1.74 y
+R² 0.915 frente a 0.898. La brecha de T3 (eval_loss interno 124.35) no se
+repite en octubre: MSE 15.48.
+
+--------------------------------------------------------------------------------
+E2: baselines de regresión sobre octubre.
+Pregunta: ¿qué error tiene una regla trivial que no usa modelo?
+--------------------------------------------------------------------------------
+Dry run: 56401413 bytes.
+
++-------------------+-----------+--------------------+--------------------+-------------------+-----------------------+
+|       model       | eval_rows |       param        |        rmse        |        mae        |          r2           |
++-------------------+-----------+--------------------+--------------------+-------------------+-----------------------+
+| baseline_mean     |    250744 | 14.460244454013013 | 13.544465514936741 | 8.701014438191999 | -0.003317719002923214 |
+| baseline_per_mile |    250744 |  5.092592592592593 | 12.515046613048337 | 6.062671762169189 |     0.143396821487226 |
++-------------------+-----------+--------------------+--------------------+-------------------+-----------------------+
+
+param es la tarifa promedio de 'train' (USD 14.46) en baseline_mean y la
+mediana de USD por milla de 'train' (5.09) en baseline_per_mile. eval_rows =
+250,744, igual que E1 (cumple). La media da R² -0.003 (octubre tiene una
+media mayor que 'train'); la tarifa por milla da R² 0.143. Un modelo solo es
+útil si supera a estos baselines: M-1 y M-2 bajan el RMSE del mejor baseline
+(12.52) a 3.93 y 4.32.
+
+--------------------------------------------------------------------------------
+E3: métricas de clasificación de M-3 sobre octubre y baseline de clase
+mayoritaria.
+Pregunta: ¿cuánto mejora la logística a una regla que siempre predice la
+clase mayoritaria de 'train'?
+--------------------------------------------------------------------------------
+Dry run: 174804140 bytes.
+
++-----------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+---------------------+
+| card_rows |     precision      |       recall       |      accuracy      |      f1_score      |      log_loss      |      roc_auc       |    train_p_true    | baseline_accuracy  | baseline_log_loss  |    accuracy_lift    |
++-----------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+---------------------+
+|    194093 | 0.6535974687027102 | 0.9169561708249991 | 0.6658199935082667 | 0.7631961329799274 | 0.6212364452230998 | 0.6922217782217782 | 0.6027630539838741 | 0.5872854765499014 | 0.6783294416354487 | 0.07853451695836533 |
++-----------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+---------------------+
+
+card_rows = 194,093 = filas con tarjeta de 'eval' en V6 de 11_features.txt
+(cumple). Con umbral 0.5, M-3 tiene exactitud 0.6658 frente a 0.5873 del
+baseline (siempre TRUE, la clase mayoritaria de 'train' con 60.28 %): 7.85
+puntos más. log_loss 0.6212 frente a 0.6783 del baseline con probabilidad
+constante. ROC-AUC 0.692 frente a 0.5 de un puntaje constante. El recall es
+alto (0.917) y la precisión moderada (0.654): el modelo predice TRUE en la
+mayoría de los viajes.
+
+--------------------------------------------------------------------------------
+E4a: matriz de confusión de M-3 sobre octubre con umbral 0.5.
+Pregunta: ¿cómo se reparten los aciertos y errores entre las dos clases?
+--------------------------------------------------------------------------------
+Dry run: 174804140 bytes.
+
++----------------+-------+--------+
+| expected_label | FALSE |  TRUE  |
++----------------+-------+--------+
+|          false | 24709 |  55396 |
+|           true |  9466 | 104522 |
++----------------+-------+--------+
+
+Filas = etiqueta real y columnas = predicción. 24,709 + 55,396 + 9,466 +
+104,522 = 194,093 (cumple). Fila TRUE: 9,466 + 104,522 = 113,988 y fila
+FALSE: 24,709 + 55,396 = 80,105, iguales a V6 de 11_features.txt (cumple).
+De la matriz: exactitud (24,709 + 104,522) / 194,093 = 0.6658, precisión
+104,522 / 159,918 = 0.6536 y recall 104,522 / 113,988 = 0.9170, iguales a
+E3. El 69 % de los viajes sin propina alta (55,396 de 80,105) se clasifica
+como TRUE.
+
+--------------------------------------------------------------------------------
+E4b: curva ROC de M-3 sobre octubre en umbrales de 0.1 a 0.9.
+Pregunta: ¿cómo cambian recall y tasa de falsos positivos al mover el umbral?
+--------------------------------------------------------------------------------
+Dry run: 174804140 bytes.
+
++-----------+-----------------------+-----------------------+----------------+-----------------+----------------+-----------------+
+| threshold |        recall         |  false_positive_rate  | true_positives | false_positives | true_negatives | false_negatives |
++-----------+-----------------------+-----------------------+----------------+-----------------+----------------+-----------------+
+|       0.1 |     0.998455977822227 |    0.9817864053429873 |         113812 |           78646 |           1459 |             176 |
+|       0.2 |    0.9906920026669473 |    0.9317770426315461 |         112927 |           74640 |           5465 |            1061 |
+|       0.3 |    0.9715759553637225 |    0.8461394419823981 |         110748 |           67780 |          12325 |            3240 |
+|       0.4 |    0.9497052321296978 |    0.7758192372511079 |         108255 |           62147 |          17958 |            5733 |
+|       0.5 |    0.9169561708249991 |    0.6915423506647526 |         104522 |           55396 |          24709 |            9466 |
+|       0.6 |    0.8391146436466996 |    0.5735721865052119 |          95649 |           45946 |          34159 |           18339 |
+|       0.7 |    0.4464154121486472 |   0.21888770988078146 |          50886 |           17534 |          62571 |           63102 |
+|       0.8 | 2.6318559848405097E-5 | 1.2483615254977842E-5 |              3 |               1 |          80104 |          113985 |
++-----------+-----------------------+-----------------------+----------------+-----------------+----------------+-----------------+
+
+En cada fila TP + FN = 113,988 y FP + TN = 80,105 (cumple). La fila 0.5
+coincide con E4a. Recall y false_positive_rate bajan de forma monótona al
+subir el umbral. Entre 0.6 y 0.7 el recall cae de 0.839 a 0.446 y en 0.8 casi
+no quedan positivos (4 viajes). ML.ROC_CURVE no devolvió el umbral 0.9:
+ninguna probabilidad llega a ese valor (E4c, n_prob_ge_0_9 = 0). El ROC-AUC
+sale de E3.
+
+--------------------------------------------------------------------------------
+E4c: distribución de la probabilidad predicha de M-3 en octubre.
+Pregunta: ¿en qué rango caen las probabilidades de propina alta que produce
+el modelo?
+--------------------------------------------------------------------------------
+Dry run: 174804140 bytes.
+
++--------+----------------------+--------------------+--------------------+--------------------+-------------------+--------------------+---------------+---------------+
+| n_rows |       min_prob       |      p10_prob      |      p50_prob      |      p90_prob      |     p99_prob      |      max_prob      | n_prob_ge_0_8 | n_prob_ge_0_9 |
++--------+----------------------+--------------------+--------------------+--------------------+-------------------+--------------------+---------------+---------------+
+| 194093 | 4.885396052966331E-4 | 0.3538205663787795 | 0.6758997965823473 | 0.7402205508532493 | 0.770621896714711 | 0.8278665893345496 |             4 |             0 |
++--------+----------------------+--------------------+--------------------+--------------------+-------------------+--------------------+---------------+---------------+
+
+La mediana es 0.676 y el p90 es 0.740; el máximo es 0.828 y solo 4 viajes
+llegan a 0.8. Las probabilidades se concentran en un rango estrecho por
+encima de 0.6, lo que explica el recall alto con umbral 0.5 y la caída de la
+curva entre 0.6 y 0.8. Percentiles aproximados (APPROX_QUANTILES).
+
+--------------------------------------------------------------------------------
+E5a: métricas de regresión de M-1 y M-2 sobre noviembre.
+Pregunta: ¿las métricas de octubre se mantienen en un mes que ningún modelo
+usó de ninguna forma?
+--------------------------------------------------------------------------------
+Dry run: 192781043 bytes.
+
++------------------+----------+--------------------+--------------------+--------------------+-----------------------+----------------------+---------------------+
+|      model       | new_rows |        mae         |        mse         |        rmse        | median_absolute_error |       r2_score       | explained_variance  |
++------------------+----------+--------------------+--------------------+--------------------+-----------------------+----------------------+---------------------+
+| m_fare_linreg    |   222890 | 2.0410747662905426 | 233.26534538810762 | 15.273026726490976 |    1.2744844988310433 | -0.29948203204562973 | -0.2985993690723143 |
+| m_fare_linreg_gd |   222890 |  2.545801225770833 |  17.94596747415126 | 4.2362681069723696 |    1.7562304632025612 |     0.90002603154989 |  0.9015145055880538 |
++------------------+----------+--------------------+--------------------+--------------------+-----------------------+----------------------+---------------------+
+
+new_rows = 222,890 = split 'new' de V1 en 11_features.txt (cumple). M-2 es
+estable: RMSE 4.24 (4.32 en octubre) y R² 0.900 (0.898 en octubre). M-1
+conserva el mejor MAE (2.04) y la mejor mediana del error (1.27), pero su
+MSE sube a 233.27 y su R² cae a -0.299: peor que predecir la media. Unas
+pocas predicciones extremas dominan el error cuadrático (E6d y E6e).
+
+--------------------------------------------------------------------------------
+E5b: métricas de clasificación de M-3 en octubre frente a noviembre.
+Pregunta: como octubre definió el corte por early_stop de M-3, ¿el resultado
+se sostiene en noviembre, que el modelo nunca vio?
+--------------------------------------------------------------------------------
+Dry run: 174804140 bytes.
+
++-----------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+
+| split_set |     precision      |       recall       |      accuracy      |      f1_score      |      log_loss      |      roc_auc       |
++-----------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+
+| eval      | 0.6535974687027102 | 0.9169561708249991 | 0.6658199935082667 | 0.7631961329799274 | 0.6212364452230997 | 0.6922197802197803 |
+| new       | 0.6553124956374855 | 0.9213075179337212 | 0.6674834613557633 | 0.7658717048240193 | 0.6195002975826196 | 0.6922747252747252 |
++-----------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+
+
+Noviembre repite las cifras de octubre: exactitud 0.6675 frente a 0.6658,
+ROC-AUC 0.6923 frente a 0.6922 y log_loss 0.6195 frente a 0.6212. El corte
+por early_stop sobre octubre no le dio a octubre una ventaja visible.
+Nota: el roc_auc de octubre varía en el sexto decimal entre ejecuciones
+(0.6922218 en E3, 0.6922198 aquí y 0.6922208 en E7b): ML.EVALUATE lo
+calcula con una aproximación. Las demás métricas coinciden.
+
+--------------------------------------------------------------------------------
+E6a: magnitud de los pesos de M-1 y M-2.
+Pregunta: ¿los pesos de M-1 son mucho más grandes que los de M-2, como predice
+la hipótesis de colinealidad de T3?
+--------------------------------------------------------------------------------
+Dry run: 43504 bytes.
+
++------------------+-----------+-------------------+--------------------+--------------+---------------+--------------------+-------------------+
+|      model       | n_weights |  max_abs_weight   |   p50_abs_weight   | n_abs_gt_100 | n_abs_gt_1000 |     intercept      |  w_trip_distance  |
++------------------+-----------+-------------------+--------------------+--------------+---------------+--------------------+-------------------+
+| m_fare_linreg    |       573 | 20163.41325468541 | 4041.2643666255453 |          570 |           555 |   777.154124325871 | 2.564800417323993 |
+| m_fare_linreg_gd |       573 | 35.96688310108079 | 2.3076894872967286 |            0 |             0 | -5.056962716548965 | 1.789270580988286 |
++------------------+-----------+-------------------+--------------------+--------------+---------------+--------------------+-------------------+
+
+Los dos modelos tienen 573 pesos: 2 de las features numéricas, 570 de las
+categorías de las 9 categóricas (V2 de 12_modelos.txt) y el intercepto. En M-1, 555 de 573 pesos superan 1,000 en
+valor absoluto, la mediana absoluta es 4,041 y el máximo 20,163, frente a
+una tarifa promedio de USD 14.46. En M-2 ninguno pasa de 100 (máximo 35.97,
+mediana 2.31). El peso de trip_distance es 2.56 en M-1 y 1.79 en M-2. Confirma los pesos enormes de M-1 que
+anticipaba T3.
+
+--------------------------------------------------------------------------------
+E6b: los 10 pesos de M-1 con mayor valor absoluto, junto al peso de M-2.
+Pregunta: ¿qué features concentran los pesos extremos de M-1?
+--------------------------------------------------------------------------------
+Dry run: 43504 bytes.
+
++---------------------+----------+---------------------+--------------------+
+|   processed_input   | category |      weight_m1      |     weight_m2      |
++---------------------+----------+---------------------+--------------------+
+| dropoff_location_id | 99       |  -20163.41325468541 | -2.982269083511964 |
+| dropoff_location_id | 44       | -20145.651922352685 | 2.7717779809116077 |
+| dropoff_location_id | 109      | -20141.961754849202 |  7.644501737542894 |
+| dropoff_location_id | 204      | -20140.373915477277 |  13.60767331356544 |
+| dropoff_location_id | 221      | -20140.105196121334 | 2.8090043283208113 |
+| dropoff_location_id | 115      |  -20140.05492816499 |  3.311655011056623 |
+| dropoff_location_id | 172      |  -20139.66538149721 |   6.33160550376429 |
+| dropoff_location_id | 251      |  -20139.37313249734 |  7.146188888025332 |
+| dropoff_location_id | 156      |  -20139.31658307857 |  9.773619953613434 |
+| dropoff_location_id | 214      | -20139.257854064825 |  5.178379459030295 |
++---------------------+----------+---------------------+--------------------+
+
+Los 10 son categorías de dropoff_location_id con pesos cercanos a -20,140 en
+M-1, casi iguales entre sí; en M-2 las mismas categorías pesan entre -2.98 y
+13.61. Pesos casi idénticos en todas las zonas de destino son compatibles
+con un desplazamiento común que se compensa con otro peso de signo
+contrario (por ejemplo, el de dropoff_borough o el intercepto, 777.15 en
+E6a) (hipótesis).
+
+--------------------------------------------------------------------------------
+E6c: colinealidad exacta en los datos de entrenamiento.
+Pregunta: ¿las features que señala la hipótesis son colineales de forma
+exacta en 'train'?
+--------------------------------------------------------------------------------
+Dry run: 108836987 bytes.
+
++----------------------------+-----------------------------+------------------------+-------------------+-----------------+
+| pickup_zones_multi_borough | dropoff_zones_multi_borough | passenger_missing_rows | rate_code_na_rows | mismatched_rows |
++----------------------------+-----------------------------+------------------------+-------------------+-----------------+
+|                          0 |                           0 |                  66629 |             66629 |               0 |
++----------------------------+-----------------------------+------------------------+-------------------+-----------------+
+
+Cumple: ninguna zona de origen ni de destino tiene más de un borough en
+'train', y passenger_missing = TRUE coincide fila a fila con rate_code_imp =
+'NA' (66,629 filas en los dos casos, 0 diferencias). La colinealidad exacta
+queda probada en los datos. Que sea la causa de los pesos de E6a es una
+inferencia, apoyada por E6d.
+
+--------------------------------------------------------------------------------
+E6d: los 10 errores absolutos más grandes de M-1 en noviembre.
+Pregunta: ¿el error de M-1 se reparte entre muchas filas o se concentra en
+pocas, y esas filas tienen zonas raras o ausentes en 'train'?
+--------------------------------------------------------------------------------
+Dry run: 212641195 bytes.
+
++---------+---------------+------------------------+---------+---------------+-------------------------+---------------+-------------+----------+---------+
+| pu_zone |  pu_borough   | train_rows_pickup_zone | do_zone |  do_borough   | train_rows_dropoff_zone | trip_distance | fare_amount | pred_m1  | pred_m2 |
++---------+---------------+------------------------+---------+---------------+-------------------------+---------------+-------------+----------+---------+
+| 214     | Staten Island |                      0 | 245     | Staten Island |                      20 |          4.01 |        17.0 |   5854.2 |   32.19 |
+| 59      | Bronx         |                      0 | 166     | Manhattan     |                   15358 |          6.24 |       24.66 |  3516.81 |   21.68 |
+| 2       | Queens        |                      1 | 140     | Manhattan     |                   41821 |           8.6 |        25.0 | -1545.89 |   23.09 |
+| 35      | Brooklyn      |                     86 | 35      | Brooklyn      |                     353 |          0.01 |       300.0 |    48.33 |   49.47 |
+| 219     | Queens        |                    191 | 265     | Desconocido   |                    6478 |         38.03 |       286.0 |   151.26 |   138.5 |
+| 265     | Desconocido   |                   3049 | 265     | Desconocido   |                    6478 |           0.4 |       200.0 |    67.01 |   73.24 |
+| 265     | Desconocido   |                   3049 | 265     | Desconocido   |                    6478 |          14.9 |       230.0 |   103.72 |   98.87 |
+| 132     | Queens        |                  93669 | 265     | Desconocido   |                    6478 |         42.96 |       283.0 |    158.3 |  143.46 |
+| 1       | EWR           |                     95 | 1       | EWR           |                    5269 |          0.01 |       200.0 |    81.31 |   83.74 |
+| 70      | Queens        |                   7742 | 265     | Desconocido   |                    6478 |         61.73 |       295.0 |   178.27 |  147.84 |
++---------+---------------+------------------------+---------+---------------+-------------------------+---------------+-------------+----------+---------+
+
+Las tres peores predicciones de M-1 son 5,854.20, 3,516.81 y -1,545.89 para
+tarifas reales de 17.00, 24.66 y 25.00. Sus zonas de origen (214, 59 y 2)
+tienen 0, 0 y 1 fila en 'train'. M-2 predice 32.19, 21.68 y 23.09 para esas
+mismas filas. En las 7 filas siguientes M-1 y M-2 predicen valores
+parecidos: son tarifas reales altas (200 a 300) que ningún modelo lineal
+explica con estas features. El mecanismo probable es que una zona sin peso
+propio deja sin compensar el peso de su borough (hipótesis).
+
+--------------------------------------------------------------------------------
+E6e: concentración del error cuadrático de M-1 y M-2 por mes.
+Pregunta: ¿qué parte del SSE se debe a filas con error absoluto mayor de
+USD 100 y cómo quedaría el RMSE sin ellas?
+--------------------------------------------------------------------------------
+Dry run: 192781043 bytes.
+
++-----------+------------------+--------+------------------+--------------------+---------------------+---------------------+
+| split_set |      model       | n_rows | n_abs_err_gt_100 |    max_abs_err     |  share_sse_gt_100   | rmse_without_gt_100 |
++-----------+------------------+--------+------------------+--------------------+---------------------+---------------------+
+| eval      | m_fare_linreg    | 250744 |               13 | 164.97597977754037 | 0.04850212094494354 |   3.837741291936219 |
+| eval      | m_fare_linreg_gd | 250744 |               20 |   163.367913591196 | 0.06409967493925568 |  4.1750785646177135 |
+| new       | m_fare_linreg    | 222890 |               14 |  5837.198858553962 |  0.9412726006474038 |   3.701341324889626 |
+| new       | m_fare_linreg_gd | 222890 |               13 |  250.5288098535665 | 0.06324473603228338 |   4.100239023704051 |
++-----------+------------------+--------+------------------+--------------------+---------------------+---------------------+
+
+En noviembre, 14 filas de M-1 (de 222,890) concentran el 94.1 % del SSE y el
+error máximo es 5,837.20. En octubre ninguna fila de M-1 pasa de 165 de
+error. M-2 tiene un error máximo de 250.53 en noviembre y sus filas con error
+mayor de 100 aportan cerca del 6 % del SSE en los dos meses. Sin las filas con
+error mayor de 100, M-1 tendría un RMSE de 3.70 en noviembre (M-2: 4.10).
+Es un diagnóstico: E7a mantiene todas las filas.
+
+--------------------------------------------------------------------------------
+E7a: tabla comparativa de regresión, modelos y baselines, en octubre y
+noviembre.
+Pregunta: ¿qué modelo de tarifa rinde mejor en cada mes y cuánto supera a los
+baselines?
+--------------------------------------------------------------------------------
+Dry run: 192781043 bytes.
+
++-----------+-------------------+--------+--------------------+--------------------+------------------------+
+| split_set |       model       | n_rows |        rmse        |        mae         |           r2           |
++-----------+-------------------+--------+--------------------+--------------------+------------------------+
+| eval      | m_fare_linreg     | 250744 | 3.9342370521721612 | 2.0071852706879096 |     0.9153482799633363 |
+| eval      | m_fare_linreg_gd  | 250744 |  4.315514023948929 |  2.559188240125104 |     0.8981455980601593 |
+| eval      | baseline_per_mile | 250744 | 12.515046613048517 |   6.06267176216906 |    0.14339682148740496 |
+| eval      | baseline_mean     | 250744 | 13.544465514936723 |  8.701014438192152 |   -0.00331771900293365 |
+| new       | m_fare_linreg_gd  | 222890 |  4.236268106972355 | 2.5458012257708678 |     0.9000260315498968 |
+| new       | baseline_per_mile | 222890 | 12.295613949517994 |  6.038437644046299 |    0.15778980674275134 |
+| new       | baseline_mean     | 222890 | 13.415760161344435 |  8.630997696858323 | -0.0026529285769905098 |
+| new       | m_fare_linreg     | 222890 | 15.273026726490846 | 2.0410747662905946 |    -0.2994820320456153 |
++-----------+-------------------+--------+--------------------+--------------------+------------------------+
+
+Filas por conjunto: 250,744 en octubre y 222,890 en noviembre (cumple). Las
+métricas de M-1 y M-2 calculadas a mano sobre ML.PREDICT coinciden con E1 y
+E5a de ML.EVALUATE hasta el decimal 12 o más (cumple), y las de los
+baselines de octubre coinciden con E2 (cumple). Las filas van ordenadas por
+RMSE dentro de cada mes.
+
+--------------------------------------------------------------------------------
+E7b: tabla comparativa de clasificación, M-3 y baseline de clase
+mayoritaria, en octubre y noviembre.
+Pregunta: ¿cuánto supera M-3 al baseline en cada mes?
+--------------------------------------------------------------------------------
+Dry run: 174804140 bytes.
+
++-----------+-------------------+--------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+
+| split_set |       model       | n_rows |      accuracy      |     precision      |       recall       |      f1_score      |      log_loss      |      roc_auc       |
++-----------+-------------------+--------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+
+| eval      | baseline_majority | 194093 | 0.5872854765499014 | 0.5872854765499014 |                1.0 | 0.7399872111555078 |  0.678329441635449 |                0.5 |
+| eval      | m_tip_logreg      | 194093 | 0.6658199935082667 | 0.6535974687027102 | 0.9169561708249991 | 0.7631961329799274 | 0.6212364452230997 | 0.6922207792207792 |
+| new       | baseline_majority | 172626 | 0.5903108454114676 | 0.5903108454114676 |                1.0 | 0.7423842289885586 | 0.6770678893520405 |                0.5 |
+| new       | m_tip_logreg      | 172626 | 0.6674834613557633 | 0.6553124956374855 | 0.9213075179337212 | 0.7658717048240193 | 0.6195002975826196 | 0.6922717282717282 |
++-----------+-------------------+--------+--------------------+--------------------+--------------------+--------------------+--------------------+--------------------+
+
+Filas: 194,093 en octubre y 172,626 en noviembre, iguales a V6 de
+11_features.txt (cumple). Las filas de M-3 repiten E3 y E5b. M-3 supera al
+baseline en exactitud (7.85 puntos en octubre y 7.72 en noviembre),
+precisión, F1, log_loss y ROC-AUC. El baseline gana solo en recall (1.0), que
+es trivial cuando siempre se predice TRUE.
+
+--------------------------------------------------------------------------------
+Tabla resumen
+--------------------------------------------------------------------------------
+Regresión de fare_amount (E7a; RMSE y MAE en USD):
+
+  | Conjunto  | Modelo            | RMSE  | MAE  | R²     |
+  |-----------|-------------------|-------|------|--------|
+  | octubre   | m_fare_linreg     |  3.93 | 2.01 |  0.915 |
+  | octubre   | m_fare_linreg_gd  |  4.32 | 2.56 |  0.898 |
+  | octubre   | baseline_per_mile | 12.52 | 6.06 |  0.143 |
+  | octubre   | baseline_mean     | 13.54 | 8.70 | -0.003 |
+  | noviembre | m_fare_linreg     | 15.27 | 2.04 | -0.299 |
+  | noviembre | m_fare_linreg_gd  |  4.24 | 2.55 |  0.900 |
+  | noviembre | baseline_per_mile | 12.30 | 6.04 |  0.158 |
+  | noviembre | baseline_mean     | 13.42 | 8.63 | -0.003 |
+
+Clasificación de is_high_tip con umbral 0.5 (E7b):
+
+  | Conjunto  | Modelo            | Exactitud | Precisión | Recall | F1    | log_loss | ROC-AUC |
+  |-----------|-------------------|-----------|-----------|--------|-------|----------|---------|
+  | octubre   | m_tip_logreg      | 0.666     | 0.654     | 0.917  | 0.763 | 0.621    | 0.692   |
+  | octubre   | baseline_majority | 0.587     | 0.587     | 1.000  | 0.740 | 0.678    | 0.500   |
+  | noviembre | m_tip_logreg      | 0.667     | 0.655     | 0.921  | 0.766 | 0.620    | 0.692   |
+  | noviembre | baseline_majority | 0.590     | 0.590     | 1.000  | 0.742 | 0.677    | 0.500   |
+
+--------------------------------------------------------------------------------
+Controles de consistencia
+--------------------------------------------------------------------------------
+- E1, E2 y E7a usan 250,744 filas de octubre = split 'eval' de V1 en
+  11_features.txt (cumple).
+- E5a y E7a usan 222,890 filas de noviembre = split 'new' de V1 (cumple).
+- E3, E4c y E7b usan 194,093 filas con tarjeta de octubre = card_rows de
+  'eval' en V6; E7b usa 172,626 de noviembre = card_rows de 'new' (cumple).
+- E4a suma 194,093, con 113,988 TRUE y 80,105 FALSE, como V6 (cumple); su
+  exactitud, precisión y recall coinciden con E3 (cumple).
+- E4b: TP + FN = 113,988 y FP + TN = 80,105 en cada umbral (cumple).
+- E7a frente a E1 y E5a: RMSE, MAE y R² iguales hasta el decimal 12 o más
+  (cumple).
+- Ningún dry run supera 10 GB (cumple).
+
+--------------------------------------------------------------------------------
+Conclusiones
+--------------------------------------------------------------------------------
+- Regresión, modelo recomendado: M-2 (m_fare_linreg_gd). En octubre M-1 es
+  algo mejor (RMSE 3.93 frente a 4.32, R² 0.915 frente a 0.898), pero en
+  noviembre M-1 colapsa (RMSE 15.27, R² -0.299) y M-2 se mantiene (RMSE 4.24,
+  R² 0.900). Un modelo que en producción puede predecir USD 5,854 para un
+  viaje de USD 17 no es confiable aunque su error típico sea menor (M-1
+  conserva el mejor MAE y la mejor mediana del error en los dos meses).
+- Frente a los baselines: M-2 baja el RMSE del mejor baseline (tarifa por
+  milla) un 65.5 % en octubre (12.52 a 4.32) y un 65.5 % en noviembre (12.30
+  a 4.24), y sube el R² de 0.14-0.16 a 0.90. Los dos modelos de regresión
+  son útiles frente a una regla trivial.
+- Hallazgo de M-1 en T3: los pesos enormes se confirman (E6a: 555 pesos de
+  más de 1,000) y la colinealidad exacta está probada en los datos (E6c). El
+  sobreajuste general no se confirma: en octubre M-1 tiene el mejor RMSE.
+  La falla es de inestabilidad: 14 filas de noviembre concentran el 94 % de
+  su SSE (E6e) y las peores tienen zonas de origen con 0 o 1 fila en 'train'
+  (E6d). El mecanismo probable es que una zona sin peso aprendido deja sin
+  compensar el peso de su borough (hipótesis). El mismo mecanismo explicaría
+  el eval_loss interno de 124.35 sobre el 20 % aleatorio de T3 (hipótesis).
+  La regularización L2 de M-2 lo evita.
+- Clasificación: M-3 supera al baseline de clase mayoritaria en 7.85 puntos
+  de exactitud en octubre (0.666 frente a 0.587) y 7.72 en noviembre (0.667
+  frente a 0.590), con ROC-AUC 0.692 frente a 0.5 y menor log_loss (0.621
+  frente a 0.678). Noviembre repite octubre, así que el uso de octubre en el
+  early_stop no infló el resultado.
+- La separación de M-3 es moderada: las probabilidades no pasan de 0.83
+  (E4c) y con umbral 0.5 el 69 % de los viajes sin propina alta se
+  clasifica como TRUE (E4a). La propina depende de factores que no se
+  conocen al inicio del viaje (servicio, monto final, costumbre del
+  pasajero) (hipótesis). Un umbral más alto (0.6 a 0.7, E4b) cambia recall
+  por menos falsos positivos; elegirlo depende del uso del modelo.
