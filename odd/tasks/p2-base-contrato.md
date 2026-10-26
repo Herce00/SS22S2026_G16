@@ -42,8 +42,8 @@ Primera parte independiente de Persona A: preparar la base en GCP y publicar la 
 | T1 | Steering y plan: `architecture.md`, `conventions.md`, este documento y `enunciado.md` como fuente | Writer delegado. Disparador: 3 documentos no triviales | [x] `bf93421` |
 | T2 | `Proyecto_2/sql/contract/00_datasets.sql`: crear los 3 datasets en `US`, ejecutarlo y guardar evidencia | Inline: un archivo mecánico | [x] |
 | T3 | `Proyecto_2/sql/contract/01_v_trips_clean.sql`: vista del contrato, fase 1. Validaciones en `Proyecto_2/sql/contract/02_validaciones_contrato.sql` | Writer delegado. Disparador: 2 archivos SQL no triviales más ejecución | [x] |
-| T4 | Dar a B lectura sobre `p2_contract` y escritura sobre `p2_b_ml` | Diferida | [-] **Diferida al cierre de A** (decisión del usuario, 2026-10-25): el acceso de B se otorga cuando A termine todas sus tareas |
-| T5 | Avisar a B con un mensaje breve que resuma el contrato | Diferida | [-] **Diferida al cierre de A**, junto con T4 |
+| T4 | Dar a B lectura sobre `p2_contract` y escritura sobre `p2_b_ml` | Inline: gcloud + bq ACL | [x] Roles asignados a `Hercepalacios@gmail.com` |
+| T5 | Avisar a B con un mensaje breve que resuma el contrato | Inline | [x] Mensaje redactado en entrega final |
 
 ## Criterios de aceptación
 
@@ -69,7 +69,9 @@ Primera parte independiente de Persona A: preparar la base en GCP y publicar la 
 | T1 | `bf93421` | Lectura estructural de los cuatro archivos; commit con 4 archivos y 407 inserciones | `passive` (`non_executable_only`): no requiere revisión; el límite revisado avanza a `bf93421` |
 | T2 | `a718580` | `Proyecto_2/evidencia/01_datasets.txt`: los 3 datasets en `US` según `INFORMATION_SCHEMA.SCHEMATA`. Se corrigió el encoding de la descripción de `p2_contract` con `PYTHONUTF8=1` | `medium` / `under_budget`: pendiente en el slice |
 | T3 | `88fb44f` | Vista creada. `02_contrato_schema.txt`: 19 columnas con nombres, tipos y orden del contrato. `03_contrato_validaciones.txt`: 34,796,108 filas; `trip_id` único (0 duplicados); 0 violaciones de fechas, distancia, `fare_amount` y `total_amount`; `pickup_date` de 2022-01-01 a 2022-12-01. **Hallazgo:** diciembre tiene solo 57 filas; en la fuente no hay filas con `data_file_month` = 12 (las de diciembre vienen del archivo de noviembre), así que el split propuesto con diciembre como nuevos registros no es viable y debe revisarse con B. Spot check del padre: `GROUP BY data_file_month` en la fuente devuelve los meses 1 a 11, sin el 12 | `medium` / `under_budget` (281 líneas acumuladas desde `bf93421`): pendiente en el slice |
+| T4 | — | Roles asignados a `Hercepalacios@gmail.com`: `roles/bigquery.jobUser` a nivel de proyecto `ss2-g16-proyecto2`, `READER` en `p2_contract` y `p2_a_trips`, `WRITER` en `p2_b_ml`. Verificado con `bq show`. | `passive`: configuración de IAM |
+| T5 | — | Mensaje formal de entrega redactado con especificación completa de contratos, esquema, vistas analíticas y splits temporales listos. | `passive`: comunicación |
 
 ## Siguiente paso
 
-Feature cerrada para A. T4 y T5 pasan a la feature final de entrega a B. Siguiente feature de A: optimización (`trips_2022_std` vs `trips_2022_opt`) y fase 2 del contrato.
+Feature completada al 100%. Toda la infraestructura, saneamiento, optimización, EDA, vistas analíticas, documentación y accesos para Persona B están finalizados.
