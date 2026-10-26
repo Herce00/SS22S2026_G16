@@ -2,15 +2,17 @@
 -- b_01_features.sql
 -- Propósito : Construir la tabla de features para BigQuery ML a partir del
 --             contrato: muestra determinística, features conocidas al inicio
---             del viaje (decisión M2), imputación (M6), etiquetas fare_amount
---             e is_tipped (M3) y columna de split temporal (M4, opción A).
+--             del viaje (decisión M2), imputación (M6), etiquetas fare_amount,
+--             is_tipped e is_high_tip (M1, M3), columna de split temporal (M4,
+--             opción A) y exclusión de los días con datos faltantes en la
+--             fuente.
 -- Dueño     : Persona A (decisión D8 del steering; ruta B del flujo).
 -- Entradas  : ss2-g16-proyecto2.p2_contract.v_trips_clean (fase 2; proyecta
 --             p2_a_trips.trips_2022_opt; 34,796,108 filas).
 --             bigquery-public-data.new_york_taxi_trips.taxi_zone_geom
 --             (zone_id, zone_name, borough; decisión M7).
 -- Salidas   : ss2-g16-proyecto2.p2_b_ml.features_trips.
---             Resultados de consulta F0 y V1 a V5.
+--             Resultados de consulta F0, V0 y V1 a V6.
 -- Ejecución : Un bloque por archivo, primero con --dry_run, según
 --             conventions.md:
 --             cmd //c "set PYTHONUTF8=1&& bq --project_id=ss2-g16-proyecto2
@@ -30,6 +32,10 @@
 --               SELECT DISTINCT zone_id, zone_name, borough para no duplicar
 --               viajes. Los ids 57, 105, 264 y 265 no tienen zona y su
 --               borough se etiqueta como 'Desconocido'.
+--             - Días anómalos: misma regla horaria que T8a de
+--               a_05_eda_temporal.sql y v_eda_tendencia_diaria (a_06). Marca
+--               el 2022-09-17 y el 2022-09-18 (datos faltantes en la fuente,
+--               09_eda_temporal.txt T8a a T8d).
 -- =============================================================================
 
 
@@ -80,9 +86,27 @@ WHERE MOD(trip_id, 14) = 0;
 --   passenger_missing; rate_code NULL pasa a 'NA'.
 -- - payment_type se conserva solo para filtrar (M3); nunca es feature del
 --   modelo de propina.
--- - Etiquetas: fare_amount (regresión) e is_tipped (clasificación), que solo
---   tiene valor con tarjeta (payment_type = '1') y es NULL en los demás
---   pagos (M3).
+-- - Etiquetas: fare_amount (regresión) e is_high_tip (clasificación, M1).
+--   is_high_tip = tip_amount / fare_amount >= 0.25 solo con tarjeta
+--   (payment_type = '1') y NULL en los demás pagos (M3). La tabla ya no tiene
+--   filas con fare_amount <= 0 (el contrato las excluye; min_fare = 0.01 en
+--   V4), así que la división es segura. Motivo: is_tipped es positivo en
+--   cerca del 96.4 % de los viajes con tarjeta; un modelo que siempre dice
+--   "sí" ya tiene 96 % de exactitud y la matriz de confusión y la precisión
+--   no informan nada. El umbral de 25 % queda cerca de la mediana de la tasa
+--   de propina con tarjeta (26.40 %, 08_eda_categorica.txt), lo que da clases
+--   más parejas.
+-- - is_tipped (tip_amount > 0, solo con tarjeta) se conserva como referencia.
+-- - tip_amount sale del contrato y solo se usa para construir las etiquetas.
+--   No se guarda en la tabla ni es feature (leakage, M2).
+-- - Días anómalos (calidad y leakage): se excluyen los días con al menos una
+--   hora con menos del 10 % de la mediana de su franja (día de la semana,
+--   hora) en el año. La regla se calcula sobre el contrato completo, sin el
+--   2022-12-01 (día parcial), y solo compara las horas presentes (el
+--   2022-03-13 tiene 23 horas por el cambio de horario y no se marca). Marca
+--   el 2022-09-17 y el 2022-09-18: sus viajes de la tarde y la noche faltan
+--   en la fuente, así que la mezcla horaria de esos días está sesgada y no
+--   representa la demanda real. Solo afecta al split 'train' (septiembre).
 -- - Regla de valores extremos: se excluyen las filas con fare_amount > 300.
 --   En F0, 50 de 2,486,865 filas de la muestra (0.002 %) superan 300, con
 --   p99.9 = 105 y p99.99 = 216. Un corte en el p99.9 recortaría la cola de
@@ -97,6 +121,28 @@ CREATE OR REPLACE TABLE `ss2-g16-proyecto2.p2_b_ml.features_trips` AS
 WITH zones AS (
   SELECT DISTINCT zone_id, zone_name, borough
   FROM `bigquery-public-data.new_york_taxi_trips.taxi_zone_geom`
+),
+hourly AS (
+  SELECT
+    pickup_date,
+    pickup_dow,
+    pickup_hour,
+    COUNT(*) AS trips
+  FROM `ss2-g16-proyecto2.p2_contract.v_trips_clean`
+  WHERE pickup_date != '2022-12-01'
+  GROUP BY pickup_date, pickup_dow, pickup_hour
+),
+anomalous_days AS (
+  SELECT pickup_date
+  FROM (
+    SELECT
+      pickup_date,
+      trips,
+      PERCENTILE_CONT(trips, 0.5) OVER (PARTITION BY pickup_dow, pickup_hour) AS median_slot_trips
+    FROM hourly
+  )
+  GROUP BY pickup_date
+  HAVING COUNTIF(trips < 0.10 * median_slot_trips) > 0
 )
 SELECT
   t.trip_id,
@@ -120,14 +166,62 @@ SELECT
   IFNULL(t.rate_code, 'NA') AS rate_code_imp,
   t.payment_type,
   t.fare_amount,
-  CASE WHEN t.payment_type = '1' THEN t.tip_amount > 0 END AS is_tipped
+  CASE WHEN t.payment_type = '1' THEN t.tip_amount > 0 END AS is_tipped,
+  CASE WHEN t.payment_type = '1' THEN t.tip_amount / t.fare_amount >= 0.25 END AS is_high_tip
 FROM `ss2-g16-proyecto2.p2_contract.v_trips_clean` AS t
 LEFT JOIN zones AS pz
   ON t.pickup_location_id = pz.zone_id
 LEFT JOIN zones AS dz
   ON t.dropoff_location_id = dz.zone_id
 WHERE MOD(t.trip_id, 14) = 0
-  AND t.fare_amount <= 300;
+  AND t.fare_amount <= 300
+  AND t.pickup_date NOT IN (SELECT pickup_date FROM anomalous_days);
+
+
+-- -----------------------------------------------------------------------------
+-- V0: días anómalos excluidos y filas de la muestra que se pierden.
+-- Pregunta: ¿qué días excluye la regla horaria sobre el contrato y cuántas
+-- filas de la muestra (MOD(trip_id, 14) = 0 y fare_amount <= 300) quita?
+-- Misma regla que F1. Resultado esperado: solo 2022-09-17 y 2022-09-18, y
+-- la suma de sample_rows_excluded igual a la diferencia entre la muestra
+-- filtrada de F0 y el numRows de F1.
+-- -----------------------------------------------------------------------------
+
+-- [V0]
+WITH hourly AS (
+  SELECT
+    pickup_date,
+    pickup_dow,
+    pickup_hour,
+    COUNT(*) AS trips
+  FROM `ss2-g16-proyecto2.p2_contract.v_trips_clean`
+  WHERE pickup_date != '2022-12-01'
+  GROUP BY pickup_date, pickup_dow, pickup_hour
+),
+anomalous_days AS (
+  SELECT
+    pickup_date,
+    COUNTIF(trips < 0.10 * median_slot_trips) AS hours_below_10pct
+  FROM (
+    SELECT
+      pickup_date,
+      trips,
+      PERCENTILE_CONT(trips, 0.5) OVER (PARTITION BY pickup_dow, pickup_hour) AS median_slot_trips
+    FROM hourly
+  )
+  GROUP BY pickup_date
+  HAVING COUNTIF(trips < 0.10 * median_slot_trips) > 0
+)
+SELECT
+  a.pickup_date,
+  a.hours_below_10pct,
+  COUNT(*) AS contract_trips,
+  COUNTIF(MOD(t.trip_id, 14) = 0 AND t.fare_amount <= 300) AS sample_rows_excluded
+FROM anomalous_days AS a
+JOIN `ss2-g16-proyecto2.p2_contract.v_trips_clean` AS t
+  ON t.pickup_date = a.pickup_date
+GROUP BY a.pickup_date, a.hours_below_10pct
+ORDER BY a.pickup_date;
 
 
 -- -----------------------------------------------------------------------------
@@ -240,3 +334,27 @@ SELECT
   COUNT(DISTINCT pickup_hour) AS hour_values,
   COUNT(DISTINCT pickup_dow) AS dow_values
 FROM `ss2-g16-proyecto2.p2_b_ml.features_trips`;
+
+
+-- -----------------------------------------------------------------------------
+-- V6: balance de la etiqueta is_high_tip.
+-- Pregunta: ¿is_high_tip solo tiene valor con tarjeta y qué porcentaje de los
+-- viajes con tarjeta deja una propina de al menos 25 % de la tarifa en cada
+-- split?
+-- Resultado esperado: high_tip_non_null = card_rows, non_card_with_label = 0
+-- y pct_high_tip aproximadamente entre 40 % y 60 %. Si queda fuera de ese
+-- rango se reporta; el umbral no se ajusta.
+-- -----------------------------------------------------------------------------
+
+-- [V6]
+SELECT
+  split_set,
+  COUNTIF(payment_type = '1') AS card_rows,
+  COUNTIF(is_high_tip IS NOT NULL) AS high_tip_non_null,
+  COUNTIF(payment_type != '1' AND is_high_tip IS NOT NULL) AS non_card_with_label,
+  COUNTIF(is_high_tip) AS high_tip_true,
+  COUNTIF(NOT is_high_tip) AS high_tip_false,
+  ROUND(100 * COUNTIF(is_high_tip) / COUNTIF(is_high_tip IS NOT NULL), 2) AS pct_high_tip
+FROM `ss2-g16-proyecto2.p2_b_ml.features_trips`
+GROUP BY split_set
+ORDER BY MIN(pickup_month);

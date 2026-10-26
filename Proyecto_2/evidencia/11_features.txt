@@ -6,21 +6,25 @@ Fuentes: ss2-g16-proyecto2.p2_contract.v_trips_clean (fase 2, 34,796,108 filas)
          y bigquery-public-data.new_york_taxi_trips.taxi_zone_geom (M7).
 Salida: ss2-g16-proyecto2.p2_b_ml.features_trips.
 Proyecto: ss2-g16-proyecto2 (ubicación US). Fecha de ejecución: 2026-10-25.
+Versión: tabla recreada después de la revisión review-5cb79f936ff5075f, con la
+etiqueta is_high_tip y sin los días con datos faltantes en la fuente. La
+versión anterior (commit e837b56) tenía 2,486,815 filas.
 ================================================================================
 
 --------------------------------------------------------------------------------
 Método
 --------------------------------------------------------------------------------
-- Cada bloque se extrajo de su etiqueta [F0], [F1] o [V1] a [V5] del script a
-  un archivo propio, así que el texto ejecutado coincide byte a byte con el
-  bloque.
+- Cada bloque se extrajo de su etiqueta [F0], [F1], [V0] o [V1] a [V6] del
+  script a un archivo propio, así que el texto ejecutado coincide byte a byte
+  con el bloque.
 - Cada bloque se ejecutó primero con --dry_run y luego real, con
   --format=pretty. Se quitaron las líneas "Waiting on bqjob".
 - El dry run sobre la vista del contrato es una cota superior ("upper
   bound"). Ningún bloque supera el límite de 10 GB; el mayor (F1) estima
-  2,929,084,990 bytes.
+  3,207,453,854 bytes.
 - F0 se ejecutó antes de F1 para fijar el umbral de valores extremos.
-- Los percentiles salen de APPROX_QUANTILES y son aproximados.
+- Los percentiles salen de APPROX_QUANTILES y son aproximados. Las medianas de
+  la regla de días anómalos salen de PERCENTILE_CONT y son exactas.
 
 --------------------------------------------------------------------------------
 F0: medición de valores extremos de fare_amount en la muestra.
@@ -41,113 +45,137 @@ es 216, así que el umbral de 300 queda por encima de la cola normal y se
 mantiene. Un corte en el p99.9 (105) recortaría la cola de las tarifas
 Newark, Nassau/Westchester y negociada (promedios de USD 68.59 a 74.01, C3a de
 08_eda_categorica.txt), que probablemente son viajes legítimos (hipótesis).
+F0 mide la muestra antes de los filtros, así que su salida es igual a la de
+la versión anterior.
 
 --------------------------------------------------------------------------------
 F1: creación de p2_b_ml.features_trips.
 Pregunta: ¿cómo queda el dataset limpio y sin leakage que consumen los modelos
 de T3?
 --------------------------------------------------------------------------------
-Dry run: upper bound of 2929084990 bytes.
+Dry run: upper bound of 3207453854 bytes.
 
-Created ss2-g16-proyecto2.p2_b_ml.features_trips
+Replaced ss2-g16-proyecto2.p2_b_ml.features_trips
 
 bq show ss2-g16-proyecto2:p2_b_ml.features_trips:
-  numRows: 2486815
-  numBytes: 244714907
+  numRows: 2482519
+  numBytes: 246198387
   Esquema: trip_id INTEGER, split_set STRING, is_eval BOOLEAN,
            pickup_month INTEGER, pickup_hour STRING, pickup_dow STRING,
            trip_distance FLOAT, passenger_count_imp INTEGER,
            passenger_missing BOOLEAN, pickup_location_id STRING,
            dropoff_location_id STRING, pickup_borough STRING,
            dropoff_borough STRING, vendor_id STRING, rate_code_imp STRING,
-           payment_type STRING, fare_amount FLOAT, is_tipped BOOLEAN
+           payment_type STRING, fare_amount FLOAT, is_tipped BOOLEAN,
+           is_high_tip BOOLEAN
 
-Control: 2,486,865 filas de la muestra - 50 filas con fare_amount > 300 =
-2,486,815 (cumple). Los dos LEFT JOIN contra las zonas deduplicadas no
-duplicaron viajes.
+Control: 2,486,865 filas de la muestra - 50 con fare_amount > 300 - 4,296 de
+los días anómalos (V0) = 2,482,519 (cumple). Los dos LEFT JOIN contra las
+zonas deduplicadas no duplicaron viajes.
+
+--------------------------------------------------------------------------------
+V0: días anómalos excluidos y filas de la muestra que se pierden.
+Pregunta: ¿qué días excluye la regla horaria sobre el contrato y cuántas filas
+de la muestra quita?
+--------------------------------------------------------------------------------
+Dry run: upper bound of 1391842040 bytes.
+
++-------------+-------------------+----------------+----------------------+
+| pickup_date | hours_below_10pct | contract_trips | sample_rows_excluded |
++-------------+-------------------+----------------+----------------------+
+|  2022-09-17 |                 9 |          56859 |                 3996 |
+|  2022-09-18 |                24 |           3832 |                  300 |
++-------------+-------------------+----------------+----------------------+
+
+La regla horaria (una hora con menos del 10 % de la mediana de su franja día
+de la semana × hora) marca solo el 2022-09-17 (9 horas) y el 2022-09-18 (24
+horas), igual que T8a de 09_eda_temporal.txt sobre trips_2022_opt. Se excluyen
+3,996 + 300 = 4,296 filas de la muestra, todas del split 'train'.
 
 --------------------------------------------------------------------------------
 V1: filas por split.
 Pregunta: ¿cada split tiene filas y los tres suman el total de la tabla?
 --------------------------------------------------------------------------------
-Dry run: 36605701 bytes.
+Dry run: 36541261 bytes.
 
 +-----------+------------+------------+----------+-----------+-----------+
 | split_set | rows_split | rows_total | pct_rows | min_month | max_month |
 +-----------+------------+------------+----------+-----------+-----------+
-| train     |    2013181 |    2486815 |    80.95 |         1 |         9 |
-| eval      |     250744 |    2486815 |    10.08 |        10 |        10 |
-| new       |     222890 |    2486815 |     8.96 |        11 |        12 |
+| train     |    2008885 |    2482519 |    80.92 |         1 |         9 |
+| eval      |     250744 |    2482519 |     10.1 |        10 |        10 |
+| new       |     222890 |    2482519 |     8.98 |        11 |        12 |
 +-----------+------------+------------+----------+-----------+-----------+
 
-Control: 2,013,181 + 250,744 + 222,890 = 2,486,815 = numRows de F1 (cumple).
-Los tres splits tienen filas y el total supera 1,000,000 (cumple). El split
-'new' llega hasta el mes 12: incluye las filas del 2022-12-01.
+Control: 2,008,885 + 250,744 + 222,890 = 2,482,519 = numRows de F1 (cumple).
+Los tres splits tienen filas y el total supera 1,000,000 (cumple). 'train'
+tiene 4,296 filas menos que la versión anterior (2,013,181), justo las de los
+días anómalos; 'eval' y 'new' no cambian. El split 'new' llega hasta el mes
+12: incluye las filas del 2022-12-01.
 
 --------------------------------------------------------------------------------
 V2: nulos por feature después de la imputación.
 Pregunta: ¿queda algún NULL en las features de los modelos?
 --------------------------------------------------------------------------------
-Dry run: 176359273 bytes.
+Dry run: 176056430 bytes.
 
 +------------------+-----------------+--------------------+--------------------------+------------------------+-------------------------+--------------------------+---------------------+----------------------+----------------+--------------------+------------------+-------------------+-------------------+
 | null_pickup_hour | null_pickup_dow | null_trip_distance | null_passenger_count_imp | null_passenger_missing | null_pickup_location_id | null_dropoff_location_id | null_pickup_borough | null_dropoff_borough | null_vendor_id | null_rate_code_imp | null_fare_amount | imputed_passenger | imputed_rate_code |
 +------------------+-----------------+--------------------+--------------------------+------------------------+-------------------------+--------------------------+---------------------+----------------------+----------------+--------------------+------------------+-------------------+-------------------+
-|                0 |               0 |                  0 |                        0 |                      0 |                       0 |                        0 |                   0 |                    0 |              0 |                  0 |                0 |             83259 |             83259 |
+|                0 |               0 |                  0 |                        0 |                      0 |                       0 |                        0 |                   0 |                    0 |              0 |                  0 |                0 |             82656 |             82656 |
 +------------------+-----------------+--------------------+--------------------------+------------------------+-------------------------+--------------------------+---------------------+----------------------+----------------+--------------------+------------------+-------------------+-------------------+
 
 Ninguna feature ni la etiqueta fare_amount tiene NULL (cumple). Se imputaron
-83,259 filas (3.35 % de la tabla) en passenger_count y las mismas 83,259 en
+82,656 filas (3.33 % de la tabla) en passenger_count y las mismas 82,656 en
 rate_code, coherente con el bloque cerrado del código 0 (3.36 % del total en
 C1 de 08_eda_categorica.txt).
 
 --------------------------------------------------------------------------------
-V3: balance de la etiqueta is_tipped.
+V3: balance de la etiqueta is_tipped (referencia).
 Pregunta: ¿is_tipped solo tiene valor con tarjeta y qué porcentaje deja
 propina en cada split?
 --------------------------------------------------------------------------------
-Dry run: 45974299 bytes.
+Dry run: 45894052 bytes.
 
 +-----------+-----------+-----------------+---------------------+-------------+--------------+------------+
 | split_set | card_rows | tipped_non_null | non_card_with_label | tipped_true | tipped_false | pct_tipped |
 +-----------+-----------+-----------------+---------------------+-------------+--------------+------------+
-| train     |   1541434 |         1541434 |                   0 |     1485353 |        56081 |      96.36 |
+| train     |   1538515 |         1538515 |                   0 |     1482587 |        55928 |      96.36 |
 | eval      |    194093 |          194093 |                   0 |      187176 |         6917 |      96.44 |
 | new       |    172626 |          172626 |                   0 |      166789 |         5837 |      96.62 |
 +-----------+-----------+-----------------+---------------------+-------------+--------------+------------+
 
 Control: en cada split, tipped_non_null = card_rows y non_card_with_label = 0
-(cumple): is_tipped solo existe para payment_type '1'. En total hay 1,908,153
-filas con tarjeta, 1,839,318 con propina y 68,835 sin propina (96.39 %),
-cerca del 96.38 % de C8a en la tabla completa. La clase positiva domina: el
-modelo de T3 debe evaluarse con ROC-AUC, precisión y recall, no solo con
-exactitud.
+(cumple): is_tipped solo existe para payment_type '1'. En total hay 1,905,234
+filas con tarjeta, 1,836,552 con propina y 68,682 sin propina (96.40 %).
+Con esa proporción, un modelo que siempre predice "con propina" ya tiene
+96 % de exactitud; por eso is_tipped queda solo como referencia y el modelo
+logístico usa is_high_tip (V6, decisión M1).
 
 --------------------------------------------------------------------------------
 V4: estadísticas de fare_amount por split.
 Pregunta: ¿la etiqueta de regresión tiene una distribución parecida en los tres
 splits y respeta el umbral de valores extremos?
 --------------------------------------------------------------------------------
-Dry run: 56500221 bytes.
+Dry run: 56401413 bytes.
 
 +-----------+------------+----------+----------+----------+----------+----------+
 | split_set | rows_split | avg_fare | p50_fare | p99_fare | min_fare | max_fare |
 +-----------+------------+----------+----------+----------+----------+----------+
-| train     |    2013181 |    14.46 |     10.0 |     55.5 |     0.01 |    300.0 |
-| eval      |     250744 |    15.24 |     10.5 |    59.96 |     0.01 |    300.0 |
+| train     |    2008885 |    14.46 |     10.0 |     56.0 |     0.01 |    300.0 |
+| eval      |     250744 |    15.24 |     10.5 |    59.98 |     0.01 |    300.0 |
 | new       |     222890 |    15.15 |     10.5 |     60.0 |     0.01 |    300.0 |
 +-----------+------------+----------+----------+----------+----------+----------+
 
 max_fare <= 300 en los tres splits (cumple). Octubre y noviembre tienen una
 tarifa promedio algo mayor que enero-septiembre (15.24 y 15.15 frente a
-14.46) y un p99 más alto (59.96 y 60.0 frente a 55.5). Es un corrimiento
+14.46) y un p99 más alto (59.98 y 60.0 frente a 56.0). Es un corrimiento
 leve que la evaluación de T4 debe tener en cuenta.
 
 --------------------------------------------------------------------------------
 V5: cardinalidad de las features categóricas.
 Pregunta: ¿cuántas categorías distintas ve cada modelo?
 --------------------------------------------------------------------------------
-Dry run: 114188898 bytes.
+Dry run: 113993455 bytes.
 
 +--------------+---------------+-----------------+------------------+------------------+---------------+-------------+------------+
 | pickup_zones | dropoff_zones | pickup_boroughs | dropoff_boroughs | rate_code_values | vendor_values | hour_values | dow_values |
@@ -161,13 +189,40 @@ Island, EWR y 'Desconocido'), 8 valores de rate_code_imp (7 códigos más
 'NA'), 4 vendor_id, 24 horas y 7 días.
 
 --------------------------------------------------------------------------------
+V6: balance de la etiqueta is_high_tip.
+Pregunta: ¿is_high_tip solo tiene valor con tarjeta y qué porcentaje de los
+viajes con tarjeta deja una propina de al menos 25 % de la tarifa?
+--------------------------------------------------------------------------------
+Dry run: 45894052 bytes.
+
++-----------+-----------+-------------------+---------------------+---------------+----------------+--------------+
+| split_set | card_rows | high_tip_non_null | non_card_with_label | high_tip_true | high_tip_false | pct_high_tip |
++-----------+-----------+-------------------+---------------------+---------------+----------------+--------------+
+| train     |   1538515 |           1538515 |                   0 |        927360 |         611155 |        60.28 |
+| eval      |    194093 |            194093 |                   0 |        113988 |          80105 |        58.73 |
+| new       |    172626 |            172626 |                   0 |        101903 |          70723 |        59.03 |
++-----------+-----------+-------------------+---------------------+---------------+----------------+--------------+
+
+Control: en cada split, high_tip_non_null = card_rows y non_card_with_label =
+0 (cumple): is_high_tip solo existe para payment_type '1'. En total, 1,143,251
+de 1,905,234 filas con tarjeta tienen is_high_tip = TRUE (60.01 %) y 761,983
+FALSE. El rango esperado era de 40 % a 60 %: eval (58.73 %) y new (59.03 %)
+quedan dentro, y train (60.28 %) queda 0.28 puntos por encima. Se reporta y el
+umbral de 0.25 no se ajusta. Las clases quedan mucho más parejas que con
+is_tipped (96.40 %).
+
+--------------------------------------------------------------------------------
 Controles de consistencia
 --------------------------------------------------------------------------------
-- F0: 2,486,865 filas - 50 excluidas = numRows de F1 = 2,486,815 (cumple).
-- V1: train + eval + new = 2,486,815 = numRows de F1 (cumple).
+- F0: 2,486,865 filas - 50 por fare_amount > 300 - 4,296 de días anómalos
+  (V0) = numRows de F1 = 2,482,519 (cumple).
+- V0: solo 2022-09-17 y 2022-09-18 excluidos (cumple).
+- V1: train + eval + new = 2,482,519 = numRows de F1 (cumple).
 - V2: 0 NULL en las 11 features y en fare_amount (cumple).
 - V3: is_tipped solo tiene valor con tarjeta en los tres splits (cumple).
 - V4: max_fare = 300.0 <= 300 en los tres splits (cumple).
+- V6: is_high_tip solo tiene valor con tarjeta (cumple); balance de 58.73 %
+  a 60.28 % (train 0.28 puntos sobre el 60 % esperado; se reporta).
 
 --------------------------------------------------------------------------------
 Notas de diseño
@@ -176,22 +231,33 @@ Notas de diseño
   viaje: pickup_hour y pickup_dow (como STRING, categóricas), trip_distance,
   passenger_count_imp, passenger_missing, zonas y boroughs de origen y
   destino, vendor_id y rate_code_imp. trip_duration_min, total_amount,
-  tip_amount y tolls_amount no entran a la tabla.
+  tip_amount y tolls_amount no entran a la tabla. tip_amount solo se lee del
+  contrato para construir is_tipped e is_high_tip.
 - Mes excluido: pickup_month se conserva solo para el split y los reportes.
   El entrenamiento cubre los meses 1 a 9; como input, los meses 10 y 11
   serían valores nunca vistos y el modelo extrapolaría.
 - Supuesto de distancia: trip_distance se trata como la distancia estimada de
   la ruta, conocida al reservar. En el dato real es la distancia medida al
   terminar el viaje.
-- M3: is_tipped vale tip_amount > 0 solo con payment_type '1' y es NULL en
-  los demás pagos (1,908,153 filas con etiqueta). payment_type queda en la
-  tabla solo para filtrar; no es feature del modelo de propina.
+- M1 y M3: la etiqueta del modelo logístico es is_high_tip = tip_amount /
+  fare_amount >= 0.25, solo con payment_type '1' y NULL en los demás pagos
+  (1,905,234 filas con etiqueta). No hay filas con fare_amount <= 0
+  (min_fare = 0.01 en V4). is_tipped se conserva como referencia.
+  payment_type queda en la tabla solo para filtrar; no es feature del modelo
+  de propina.
 - M6: passenger_count NULL pasa a 1 con la marca passenger_missing, y
-  rate_code NULL pasa a 'NA'. Son las mismas 83,259 filas, el bloque del
+  rate_code NULL pasa a 'NA'. Son las mismas 82,656 filas, el bloque del
   código 0 dentro de la muestra.
 - Regla de valores extremos: se excluyen las filas con fare_amount > 300; son
   50 de 2,486,865 (0.002 %). El umbral queda por encima del p99.99 (216) de
   la muestra.
-- Split (M4, opción A): train = ene-sep (2,013,181), eval = oct (250,744) y
+- Calidad y leakage, días anómalos: se excluyen el 2022-09-17 y el 2022-09-18
+  (4,296 filas de la muestra), días con horas que tienen menos del 10 % de la
+  mediana de su franja porque faltan datos en la fuente (T8a a T8d de
+  09_eda_temporal.txt). Con esas filas, el modelo aprendería una mezcla
+  horaria falsa para un sábado y un domingo de septiembre. La regla es la
+  misma de T8a y de v_eda_tendencia_diaria; el 2022-01-29 (demanda baja real)
+  se conserva.
+- Split (M4, opción A): train = ene-sep (2,008,885), eval = oct (250,744) y
   new = nov más las filas del 2022-12-01 (222,890). is_eval marca octubre
   para el split CUSTOM de m_tip_logreg.
