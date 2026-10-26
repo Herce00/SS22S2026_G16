@@ -53,6 +53,8 @@ Looker Studio (Tablero Ejecutivo Interactivo)
   - `p2_contract` (Compartido — Contrato formal de lectura para Persona B).
   - `p2_b_ml` (Propietario: Persona B — Modelos BQML y predicciones).
 
+![Arquitectura de Datasets en BigQuery](evidencia/03_arquitectura_datasets.png)
+
 ---
 
 ## 2. Dataset Utilizado
@@ -124,6 +126,8 @@ La tabla pública no posee particiones ni clustering, forzando a que cualquier c
 - **Estrategia:** Partición diaria `PARTITION BY DATE(pickup_datetime)`.
 - **Efecto técnico:** Crea 335 particiones de almacenamiento independientes. Cuando una consulta filtra por un rango de fechas (ej. una semana, un mes o el split temporal de entrenamiento), BigQuery ejecuta poda de particiones (*partition pruning*), leyendo exclusivamente los bloques correspondientes a los días requeridos y omitiendo el resto del año.
 
+![Detalle de Particionamiento Diario en BigQuery](evidencia/01_optimizacion_particiones.png)
+
 ### 2. Agrupamiento Físico (*Clustering*) por Ubicaciones
 - **Estrategia:** `CLUSTER BY pickup_location_id, dropoff_location_id`.
 - **Efecto técnico:** Ordena y agrupa físicamente las filas dentro de cada partición diaria según las zonas de origen y destino más transitadas (ej. JFK, Midtown, Upper East Side). Las consultas que filtran por corredor o zona geográfica leen únicamente los metadatos de los bloques co-localizados, reduciendo el I/O físico adicional.
@@ -160,6 +164,8 @@ Comparativa de Bytes Procesados en Consultas con Filtro Temporal / Espacial
 │ Optimizada: ███ 54.5 MB  [-91.10%]                                     │
 └────────────────────────────────────────────────────────────────────────┘
 ```
+
+![Comparación de Rendimiento y Reducción de Bytes](evidencia/02_reduccion_bytes.png)
 
 ### Análisis Técnico de los Resultados
 1. **Poda Masiva por Partición (Q1):** Al consultar 7 días de marzo, BigQuery descartó 328 de las 335 particiones diarias, procesando únicamente 12.52 MB frente a 556.74 MB de la tabla estándar (**ahorro de 97.75 % en datos leídos y 98.67 % en tiempo de CPU/slots**).
